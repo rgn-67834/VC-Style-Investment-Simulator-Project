@@ -171,6 +171,63 @@
 
   .green { color: var(--green); }
   .red   { color: var(--red); }
+
+  /* MOBILE */
+  @media (max-width: 640px) {
+    /* Nav: stack brand on top, buttons below */
+    nav {
+      height: auto;
+      flex-wrap: wrap;
+      padding: 10px 16px;
+      gap: 8px;
+    }
+    .nav-right {
+      flex-wrap: wrap;
+      gap: 6px;
+      width: 100%;
+    }
+    #last-updated { width: 100%; order: -1; }
+    .btn { font-size: 12px; padding: 6px 10px; }
+
+    /* Page padding */
+    .page { padding: 16px 12px; }
+
+    /* Summary bar: 2 columns */
+    .summary-bar { grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 16px; }
+    .summary-card { padding: 12px 14px; }
+    .summary-value { font-size: 18px; }
+
+    /* Thesis header: stack name/meta above stats */
+    .thesis-header { flex-direction: column; align-items: flex-start; gap: 8px; padding: 12px 16px; }
+    .thesis-stats { width: 100%; justify-content: space-between; }
+    .thesis-title-group { flex-direction: column; align-items: flex-start; gap: 2px; }
+
+    /* Table: tighten cell padding */
+    th { padding: 8px 10px; font-size: 10px; }
+    td { padding: 9px 10px; font-size: 12px; }
+
+    /* Modal: full-width bottom sheet feel */
+    .overlay { align-items: flex-end; }
+    .modal {
+      width: 100%;
+      max-width: 100%;
+      border-radius: var(--radius) var(--radius) 0 0;
+      padding: 20px 16px 32px;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+
+    /* Modal footer buttons full-width */
+    .modal-footer { flex-direction: column-reverse; gap: 8px; }
+    .modal-footer .btn { width: 100%; justify-content: center; }
+
+    /* Sub-section padding */
+    .sub-section { padding: 10px 12px 0; }
+    .thesis-actions { padding: 10px 12px; }
+
+    /* Watchlist header */
+    .watchlist-header { padding: 12px 16px; }
+  }
 </style>
 </head>
 <body>
