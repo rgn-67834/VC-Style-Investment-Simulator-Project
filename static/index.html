@@ -1,0 +1,963 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Thesis Tracker</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #f7f8fa;
+    --surface: #ffffff;
+    --border: #e5e7eb;
+    --text: #111827;
+    --muted: #6b7280;
+    --green: #16a34a;
+    --green-bg: #dcfce7;
+    --red: #dc2626;
+    --red-bg: #fee2e2;
+    --amber: #b45309;
+    --amber-bg: #fef3c7;
+    --blue: #1d4ed8;
+    --blue-bg: #dbeafe;
+    --accent: #2563eb;
+    --accent-hover: #1d4ed8;
+    --radius: 10px;
+    --shadow: 0 1px 6px rgba(0,0,0,.07);
+  }
+
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+         background: var(--bg); color: var(--text); font-size: 14px; line-height: 1.5; }
+
+  /* NAV */
+  nav { background: var(--surface); border-bottom: 1px solid var(--border);
+        padding: 0 24px; height: 56px; display: flex; align-items: center;
+        justify-content: space-between; position: sticky; top: 0; z-index: 100; }
+  .nav-brand { font-weight: 700; font-size: 16px; letter-spacing: -.3px; }
+  .nav-right { display: flex; gap: 10px; align-items: center; }
+  #last-updated { font-size: 12px; color: var(--muted); }
+
+  /* BUTTONS */
+  .btn { display: inline-flex; align-items: center; gap: 6px;
+         padding: 7px 14px; border-radius: 7px; font-size: 13px;
+         font-weight: 500; cursor: pointer; border: none; transition: background .15s; }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover { background: var(--accent-hover); }
+  .btn-ghost { background: transparent; color: var(--muted); border: 1px solid var(--border); }
+  .btn-ghost:hover { background: var(--bg); }
+  .btn-danger { background: var(--red-bg); color: var(--red); border: none; }
+  .btn-danger:hover { background: #fecaca; }
+  .btn-warning { background: var(--amber-bg); color: var(--amber); border: none; }
+  .btn-warning:hover { background: #fde68a; }
+  .btn-sm { padding: 4px 10px; font-size: 12px; }
+  .btn:disabled { opacity: .5; cursor: not-allowed; }
+
+  /* LAYOUT */
+  .page { max-width: 1140px; margin: 0 auto; padding: 28px 20px; }
+
+  /* SUMMARY BAR */
+  .summary-bar { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+                 gap: 12px; margin-bottom: 24px; }
+  .summary-card { background: var(--surface); border: 1px solid var(--border);
+                  border-radius: var(--radius); padding: 16px 20px; box-shadow: var(--shadow); }
+  .summary-label { font-size: 11px; text-transform: uppercase; color: var(--muted); letter-spacing: .5px; }
+  .summary-value { font-size: 24px; font-weight: 700; margin-top: 4px; }
+
+  /* THESIS CARDS */
+  .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+  .section-title { font-size: 15px; font-weight: 600; }
+  .thesis-grid { display: flex; flex-direction: column; gap: 16px; }
+
+  .thesis-card { background: var(--surface); border: 1px solid var(--border);
+                 border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; }
+  .thesis-header { display: flex; align-items: center; justify-content: space-between;
+                   padding: 16px 20px; cursor: pointer; user-select: none; }
+  .thesis-header:hover { background: var(--bg); }
+  .thesis-title-group { display: flex; align-items: center; gap: 12px; }
+  .thesis-name { font-weight: 600; font-size: 15px; }
+  .thesis-meta { font-size: 12px; color: var(--muted); }
+  .thesis-stats { display: flex; align-items: center; gap: 16px; }
+  .thesis-value { font-size: 14px; }
+  .chevron { transition: transform .2s; color: var(--muted); font-size: 12px; }
+  .thesis-card.open .chevron { transform: rotate(180deg); }
+
+  .thesis-body { display: none; border-top: 1px solid var(--border); }
+  .thesis-card.open .thesis-body { display: block; }
+
+  .thesis-actions { display: flex; justify-content: flex-end; gap: 8px;
+                    padding: 12px 20px; border-bottom: 1px solid var(--border); background: var(--bg); }
+
+  /* SUB-SECTION HEADERS (open / closed inside a thesis) */
+  .sub-section { padding: 10px 20px 0; }
+  .sub-section-title { font-size: 12px; font-weight: 600; text-transform: uppercase;
+                       letter-spacing: .6px; color: var(--muted); margin-bottom: 0; }
+
+  /* TABLE */
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; }
+  th { text-align: left; padding: 10px 16px; font-size: 11px; text-transform: uppercase;
+       color: var(--muted); letter-spacing: .5px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  td { padding: 11px 16px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: #fafafa; }
+  .ticker-cell { font-weight: 600; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 13px; }
+  .num { text-align: right; }
+  .no-data { padding: 24px 20px; color: var(--muted); font-style: italic; text-align: center; }
+
+  /* BADGES */
+  .badge { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 9999px;
+           font-size: 11px; font-weight: 600; white-space: nowrap; }
+  .badge-green  { background: var(--green-bg);  color: var(--green); }
+  .badge-red    { background: var(--red-bg);    color: var(--red); }
+  .badge-amber  { background: var(--amber-bg);  color: var(--amber); }
+  .badge-blue   { background: var(--blue-bg);   color: var(--blue); }
+  .badge-gray   { background: var(--border);    color: var(--muted); }
+
+  /* OPPORTUNITY INDICATOR */
+  .opp-positive { color: var(--red); font-weight: 600; }   /* left money on the table */
+  .opp-negative { color: var(--green); font-weight: 600; } /* sold at the right time */
+
+  /* PRIVATE POSITION TOGGLE */
+  .type-toggle { display: flex; gap: 0; margin-bottom: 18px; border: 1px solid var(--border); border-radius: 7px; overflow: hidden; }
+  .type-toggle button { flex: 1; padding: 8px; font-size: 13px; font-weight: 500; cursor: pointer;
+                        border: none; background: transparent; color: var(--muted); transition: all .15s; }
+  .type-toggle button.active { background: var(--accent); color: #fff; }
+  .private-fields { display: none; }
+  .public-fields  { display: block; }
+
+  /* MOIC badge */
+  .badge-moic { background: #ede9fe; color: #6d28d9; }
+
+  /* CLOSED POSITIONS divider */
+  .closed-divider { border: none; border-top: 2px dashed var(--border); margin: 4px 16px; }
+
+  /* WATCHLIST */
+  .watchlist-card { background: var(--surface); border: 1px solid var(--border);
+                    border-radius: var(--radius); box-shadow: var(--shadow); margin-top: 28px; }
+  .watchlist-header { display: flex; align-items: center; justify-content: space-between;
+                      padding: 16px 20px; border-bottom: 1px solid var(--border); }
+
+  /* MODAL */
+  .overlay { position: fixed; inset: 0; background: rgba(0,0,0,.4);
+             display: none; align-items: center; justify-content: center; z-index: 200; }
+  .overlay.open { display: flex; }
+  .modal { background: var(--surface); border-radius: var(--radius); padding: 28px;
+           width: 440px; max-width: 95vw; box-shadow: 0 20px 60px rgba(0,0,0,.2); }
+  .modal-title { font-size: 16px; font-weight: 700; margin-bottom: 6px; }
+  .modal-subtitle { font-size: 13px; color: var(--muted); margin-bottom: 20px; }
+  .modal-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px; }
+
+  /* FORM */
+  .form-group { margin-bottom: 14px; }
+  label { display: block; font-size: 12px; font-weight: 500; color: var(--muted); margin-bottom: 6px; }
+  input, select { width: 100%; padding: 9px 12px; border: 1px solid var(--border); border-radius: 7px;
+                  font-size: 14px; color: var(--text); background: var(--surface);
+                  outline: none; transition: border-color .15s; }
+  input:focus, select:focus { border-color: var(--accent); }
+  .form-hint { font-size: 11px; color: var(--muted); margin-top: 4px; }
+  .form-error { font-size: 12px; color: var(--red); margin-top: 12px; min-height: 18px; }
+
+  /* INFO BOX */
+  .info-box { background: var(--blue-bg); border-radius: 8px; padding: 12px 14px;
+              font-size: 13px; color: var(--blue); margin-top: 16px; line-height: 1.6; }
+  .info-box b { font-weight: 600; }
+
+  /* SPINNER */
+  .spinner { display: inline-block; width: 16px; height: 16px;
+             border: 2px solid var(--border); border-top-color: var(--accent);
+             border-radius: 50%; animation: spin .6s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .green { color: var(--green); }
+  .red   { color: var(--red); }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-brand">📈 Thesis Tracker</div>
+  <div class="nav-right">
+    <span id="last-updated"></span>
+    <button class="btn btn-ghost" onclick="loadData(true)" id="refresh-btn">↻ Refresh Prices</button>
+    <button class="btn btn-ghost" onclick="openWatchlistModal()">+ Watchlist</button>
+    <button class="btn btn-primary" onclick="openNewThesisModal()">+ New Thesis</button>
+  </div>
+</nav>
+
+<div class="page">
+  <div class="summary-bar">
+    <div class="summary-card"><div class="summary-label">Total Deployed</div><div class="summary-value" id="s-cost">—</div></div>
+    <div class="summary-card"><div class="summary-label">Current Value</div><div class="summary-value" id="s-value">—</div></div>
+    <div class="summary-card"><div class="summary-label">Total Return</div><div class="summary-value" id="s-return">—</div></div>
+    <div class="summary-card"><div class="summary-label">Return %</div><div class="summary-value" id="s-pct">—</div></div>
+  </div>
+
+  <div class="section-header">
+    <div class="section-title">Investment Theses</div>
+  </div>
+  <div class="thesis-grid" id="thesis-grid">
+    <div style="padding:40px;text-align:center;color:var(--muted)">
+      <div class="spinner"></div>
+      <div style="margin-top:12px">Loading portfolio data…</div>
+    </div>
+  </div>
+
+  <div class="watchlist-card">
+    <div class="watchlist-header">
+      <div class="section-title">Watchlist</div>
+    </div>
+    <div id="watchlist-body"><div class="no-data">Loading…</div></div>
+  </div>
+</div>
+
+<!-- New Thesis Modal -->
+<div class="overlay" id="thesis-modal">
+  <div class="modal">
+    <div class="modal-title">New Investment Thesis</div>
+    <div class="modal-subtitle">Give it a name that describes your investment idea.</div>
+    <div class="form-group">
+      <label>Thesis Name</label>
+      <input id="thesis-name-input" placeholder='e.g. "AI Infrastructure"' />
+    </div>
+    <div class="form-error" id="thesis-modal-error"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('thesis-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="submitNewThesis()">Create</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add Position Modal -->
+<div class="overlay" id="position-modal">
+  <div class="modal">
+    <div class="modal-title">Add Position</div>
+    <div class="type-toggle">
+      <button id="toggle-public" class="active" onclick="setPositionType('public')">📈 Public / ETF</button>
+      <button id="toggle-private" onclick="setPositionType('private')">🏢 Private / Startup</button>
+    </div>
+    <div class="form-group">
+      <label>Thesis</label>
+      <select id="pos-thesis"></select>
+    </div>
+
+    <!-- Public fields -->
+    <div class="public-fields" id="public-fields">
+      <div class="form-group">
+        <label>Ticker Symbol</label>
+        <input id="pos-ticker" placeholder="AAPL" style="text-transform:uppercase" />
+      </div>
+      <div class="form-group">
+        <label>Shares</label>
+        <input id="pos-shares" type="number" min="0.0001" step="any" placeholder="10" />
+      </div>
+      <div class="form-group">
+        <label>Entry Price (optional)</label>
+        <input id="pos-price" type="number" min="0" step="any" placeholder="Today's market price" />
+        <div class="form-hint">Leave blank to use today's market price.</div>
+      </div>
+      <div class="form-group">
+        <label>Entry Date (optional)</label>
+        <input id="pos-entry-date" type="date" />
+        <div class="form-hint">Backdate to simulate a past investment. Defaults to today.</div>
+      </div>
+    </div>
+
+    <!-- Private fields -->
+    <div class="private-fields" id="private-fields">
+      <div class="form-group">
+        <label>Company Name</label>
+        <input id="priv-company" placeholder='e.g. "Stripe"' />
+      </div>
+      <div class="form-group">
+        <label>Simulated Investment ($)</label>
+        <input id="priv-investment" type="number" min="0" step="any" placeholder="50000" />
+        <div class="form-hint">The dollar amount you're simulating investing.</div>
+      </div>
+      <div class="form-group">
+        <label>Company Valuation at Entry ($)</label>
+        <input id="priv-entry-val" type="number" min="0" step="any" placeholder="5000000000" />
+        <div class="form-hint">Sets your implied ownership %. E.g. 5000000000 = $5B.</div>
+      </div>
+      <div class="form-group">
+        <label>Current DCF Valuation ($) — optional</label>
+        <input id="priv-current-val" type="number" min="0" step="any" placeholder="Same as entry" />
+        <div class="form-hint">Leave blank to start at entry valuation. Update later with your DCF.</div>
+      </div>
+      <div class="form-group">
+        <label>Entry Date (optional)</label>
+        <input id="priv-entry-date" type="date" />
+        <div class="form-hint">Backdate to simulate a past investment. Defaults to today.</div>
+      </div>
+      <div class="form-group">
+        <label>Notes (DCF assumptions, thesis rationale)</label>
+        <input id="priv-notes" placeholder="20% discount rate, 8x revenue at exit…" />
+      </div>
+    </div>
+
+    <div class="form-error" id="pos-modal-error"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('position-modal')">Cancel</button>
+      <button class="btn btn-primary" id="pos-submit-btn" onclick="submitPosition()">Add Position</button>
+    </div>
+  </div>
+</div>
+
+<!-- Close Position Modal -->
+<div class="overlay" id="close-modal">
+  <div class="modal">
+    <div class="modal-title">Close Position</div>
+    <div class="modal-subtitle" id="close-modal-subtitle"></div>
+    <div class="form-group">
+      <label>Exit Price (optional)</label>
+      <input id="close-price" type="number" min="0" step="any" placeholder="Today's market price" />
+      <div class="form-hint">Leave blank to use today's current market price.</div>
+    </div>
+    <div class="form-error" id="close-modal-error"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('close-modal')">Cancel</button>
+      <button class="btn btn-warning" id="close-submit-btn" onclick="submitClose()">Close Position</button>
+    </div>
+  </div>
+</div>
+
+<!-- Update Private Valuation Modal -->
+<div class="overlay" id="update-private-modal">
+  <div class="modal">
+    <div class="modal-title">Update DCF Valuation</div>
+    <div class="modal-subtitle" id="update-private-subtitle"></div>
+    <div class="form-group">
+      <label>New Company Valuation ($)</label>
+      <input id="update-val-input" type="number" min="0" step="any" placeholder="7000000000" />
+      <div class="form-hint">Your latest DCF estimate for the company's total valuation.</div>
+    </div>
+    <div class="form-group">
+      <label>Update Notes (optional)</label>
+      <input id="update-notes-input" placeholder="Revised revenue assumptions…" />
+    </div>
+    <div class="form-error" id="update-private-error"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('update-private-modal')">Cancel</button>
+      <button class="btn btn-primary" id="update-private-btn" onclick="submitUpdatePrivate()">Update</button>
+    </div>
+  </div>
+</div>
+
+<!-- Close Private Modal -->
+<div class="overlay" id="close-private-modal">
+  <div class="modal">
+    <div class="modal-title">Record Exit</div>
+    <div class="modal-subtitle" id="close-private-subtitle"></div>
+    <div class="form-group">
+      <label>Exit Valuation ($)</label>
+      <input id="close-private-val" type="number" min="0" step="any" placeholder="Acquisition / IPO valuation" />
+      <div class="form-hint">The company's total valuation at exit (acquisition price, IPO market cap, write-down, etc.).</div>
+    </div>
+    <div class="form-error" id="close-private-error"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('close-private-modal')">Cancel</button>
+      <button class="btn btn-warning" id="close-private-btn" onclick="submitClosePrivate()">Record Exit</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add Watchlist Modal -->
+<div class="overlay" id="watchlist-modal">
+  <div class="modal">
+    <div class="modal-title">Add to Watchlist</div>
+    <div class="form-group">
+      <label>Ticker Symbol</label>
+      <input id="wl-ticker" placeholder="MSFT" style="text-transform:uppercase" />
+    </div>
+    <div class="form-error" id="wl-modal-error"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('watchlist-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="submitWatchlist()">Add</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  let _theses = [];
+  let _closeTarget        = { thesis: null, ticker: null };
+  let _updatePrivTarget   = { thesis: null, company: null };
+  let _closePrivTarget    = { thesis: null, company: null };
+  let _positionType = 'public';
+
+  // ---------------------------------------------------------------------------
+  // Formatting
+  // ---------------------------------------------------------------------------
+
+  const fmt  = n => n == null ? '—' : '$' + Number(n).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+  const fmtB = n => { if (n == null) return '—'; const b = n/1e9; return b >= 1 ? `$${b.toFixed(2)}B` : `$${(n/1e6).toFixed(1)}M`; };
+  const fmtN = n => n == null ? '—' : Number(n).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+  const fmtPct = (n, sign=true) => {
+    if (n == null) return '—';
+    const s = sign && n >= 0 ? '+' : '';
+    return `${s}${Number(n).toFixed(2)}%`;
+  };
+  const cc = n => n >= 0 ? 'green' : 'red';
+  const badge = (n, label=null) => {
+    if (n == null) return '<span class="badge badge-gray">N/A</span>';
+    const cls = n >= 0 ? 'badge-green' : 'badge-red';
+    const text = label || fmtPct(n);
+    return `<span class="badge ${cls}">${text}</span>`;
+  };
+
+  // ---------------------------------------------------------------------------
+  // Data loading
+  // ---------------------------------------------------------------------------
+
+  async function loadData(force=false) {
+    const btn = document.getElementById('refresh-btn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> Loading…';
+    try {
+      const [theses, watchlist] = await Promise.all([
+        fetch('/api/theses' + (force ? '?refresh=true' : '')).then(r => r.json()),
+        fetch('/api/watchlist').then(r => r.json()),
+      ]);
+      _theses = theses;
+      renderSummary(theses);
+      renderTheses(theses);
+      renderWatchlist(watchlist);
+      document.getElementById('last-updated').textContent = 'Updated ' + new Date().toLocaleTimeString();
+    } catch(e) { console.error(e); }
+    finally {
+      btn.disabled = false;
+      btn.innerHTML = '↻ Refresh Prices';
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Summary bar
+  // ---------------------------------------------------------------------------
+
+  function renderSummary(theses) {
+    const totalCost  = theses.reduce((s,t) => s + t.total_cost, 0);
+    const totalValue = theses.reduce((s,t) => s + t.total_value, 0);
+    const gain = totalValue - totalCost;
+    const pct  = totalCost ? gain / totalCost * 100 : 0;
+    document.getElementById('s-cost').textContent  = fmt(totalCost);
+    document.getElementById('s-value').textContent = fmt(totalValue);
+    const re = document.getElementById('s-return');
+    re.textContent = (gain>=0?'+':'') + fmt(Math.abs(gain));
+    re.className = 'summary-value ' + cc(gain);
+    const pe = document.getElementById('s-pct');
+    pe.textContent = fmtPct(pct);
+    pe.className = 'summary-value ' + cc(pct);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Thesis cards
+  // ---------------------------------------------------------------------------
+
+  function renderTheses(theses) {
+    const grid = document.getElementById('thesis-grid');
+    if (!theses.length) {
+      grid.innerHTML = `<div style="padding:48px;text-align:center;color:var(--muted);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius)">
+        No theses yet. Click <strong>+ New Thesis</strong> to get started.</div>`;
+      return;
+    }
+    grid.innerHTML = theses.map(thesisCardHTML).join('');
+  }
+
+  function thesisCardHTML(t) {
+    const gain = t.total_gain;
+    const privCount = (t.private_positions||[]).length;
+    const closedPrivCount = (t.closed_private_positions||[]).length;
+
+    // Open public positions
+    let openHtml;
+    if (!t.positions.length && !privCount) {
+      openHtml = `<div class="no-data" style="padding:16px 20px">No open positions.</div>`;
+    } else if (!t.positions.length) {
+      openHtml = '';
+    } else {
+      const rows = t.positions.map(p => openRowHTML(t.name, p)).join('');
+      openHtml = `
+        <div class="sub-section" style="padding-top:14px"><div class="sub-section-title">Public Positions</div></div>
+        <div class="table-wrap"><table>
+          <thead><tr>
+            <th>Ticker</th><th class="num">Shares</th><th class="num">Entry</th>
+            <th class="num">Current</th><th class="num">Value</th>
+            <th class="num">Gain/Loss</th><th class="num">Return</th>
+            <th class="num">Cap Gains</th><th class="num">After Tax</th><th class="num">Days</th><th></th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table></div>`;
+    }
+
+    // Open private positions
+    let privateHtml = '';
+    if (privCount) {
+      const rows = t.private_positions.map(p => privateRowHTML(t.name, p)).join('');
+      privateHtml = `
+        <hr class="closed-divider">
+        <div class="sub-section"><div class="sub-section-title">Private / Startup Positions</div></div>
+        <div class="table-wrap"><table>
+          <thead><tr>
+            <th>Company</th><th class="num">Invested</th><th class="num">Entry Val</th>
+            <th class="num">Current Val</th><th class="num">Impl. Own%</th>
+            <th class="num">Curr Value</th><th class="num">Gain</th>
+            <th class="num">MOIC</th><th class="num">Cap Gains</th><th class="num">Days</th><th></th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table></div>`;
+    }
+
+    // Closed public positions
+    let closedHtml = '';
+    if (t.closed_positions && t.closed_positions.length) {
+      const rows = t.closed_positions.map(p => closedRowHTML(p)).join('');
+      closedHtml = `
+        <hr class="closed-divider">
+        <div class="sub-section"><div class="sub-section-title">Closed Public Positions</div></div>
+        <div class="table-wrap"><table>
+          <thead><tr>
+            <th>Ticker</th><th class="num">Sold</th><th class="num">Entry→Exit</th>
+            <th class="num">Actual Gain</th><th class="num">After Tax</th>
+            <th class="num">If Still Held</th><th class="num">Opportunity</th>
+            <th class="num">Cap Gains</th><th class="num">Days Held</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table></div>`;
+    }
+
+    // Closed private positions
+    let closedPrivHtml = '';
+    if (closedPrivCount) {
+      const rows = t.closed_private_positions.map(p => closedPrivateRowHTML(p)).join('');
+      closedPrivHtml = `
+        <hr class="closed-divider">
+        <div class="sub-section"><div class="sub-section-title">Exited Private Positions</div></div>
+        <div class="table-wrap"><table>
+          <thead><tr>
+            <th>Company</th><th class="num">Exited</th><th class="num">Invested</th>
+            <th class="num">Entry Val</th><th class="num">Exit Val</th>
+            <th class="num">Gain</th><th class="num">MOIC</th>
+            <th class="num">After Tax</th><th class="num">Cap Gains</th><th class="num">Days</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table></div>`;
+    }
+
+    const totalOpen = t.positions.length + privCount;
+    const totalClosed = (t.closed_positions||[]).length + closedPrivCount;
+
+    return `
+      <div class="thesis-card" id="card-${escId(t.name)}">
+        <div class="thesis-header" onclick="toggleCard('${escId(t.name)}')">
+          <div class="thesis-title-group">
+            <div class="thesis-name">${esc(t.name)}</div>
+            <div class="thesis-meta">since ${t.created} · ${totalOpen} open · ${totalClosed} closed</div>
+          </div>
+          <div class="thesis-stats">
+            <div class="thesis-value">${fmt(t.total_value)}</div>
+            ${badge(t.total_gain_pct)}
+            <span class="chevron">▼</span>
+          </div>
+        </div>
+        <div class="thesis-body">
+          <div class="thesis-actions">
+            <button class="btn btn-ghost btn-sm" onclick="openAddPosition('${esc(t.name)}')">+ Add Position</button>
+          </div>
+          ${openHtml}${privateHtml}${closedHtml}${closedPrivHtml}
+        </div>
+      </div>`;
+  }
+
+  function openRowHTML(thesisName, p) {
+    const s = p.gain >= 0 ? '+' : '';
+    const termBadge = p.term === 'long-term'
+      ? '<span class="badge badge-blue">LT 15%</span>'
+      : '<span class="badge badge-amber">ST 24%</span>';
+    return `<tr>
+      <td class="ticker-cell">${esc(p.ticker)}</td>
+      <td class="num">${fmtN(p.shares)}</td>
+      <td class="num">${fmt(p.entry_price)}</td>
+      <td class="num">${fmt(p.current_price)}</td>
+      <td class="num">${fmt(p.value)}</td>
+      <td class="num ${cc(p.gain)}">${s}${fmt(Math.abs(p.gain))}</td>
+      <td class="num">${badge(p.gain_pct)}</td>
+      <td class="num">${termBadge}</td>
+      <td class="num ${cc(p.gain)}">${s}${fmt(Math.abs(p.net_gain))}</td>
+      <td class="num">${p.days_held}d</td>
+      <td style="white-space:nowrap">
+        <button class="btn btn-warning btn-sm" style="margin-right:4px"
+          onclick="openCloseModal('${esc(thesisName)}','${esc(p.ticker)}',${p.current_price})">Close</button>
+        <button class="btn btn-danger btn-sm"
+          onclick="deletePosition('${esc(thesisName)}','${esc(p.ticker)}')">✕</button>
+      </td>
+    </tr>`;
+  }
+
+  function closedRowHTML(p) {
+    const as = p.actual_gain >= 0 ? '+' : '';
+    // opportunity: positive = left money on table (bad), negative = sold at right time (good)
+    const oppVal = p.opportunity;
+    const oppClass = oppVal > 0 ? 'opp-positive' : 'opp-negative';
+    const oppText  = oppVal > 0
+      ? `+${fmt(oppVal)} left on table`
+      : `${fmt(oppVal)} saved`;
+    const termBadge = p.term === 'long-term'
+      ? '<span class="badge badge-blue">LT</span>'
+      : '<span class="badge badge-amber">ST</span>';
+
+    return `<tr>
+      <td class="ticker-cell">${esc(p.ticker)}</td>
+      <td class="num" style="font-size:12px;color:var(--muted)">${p.exit_date}</td>
+      <td class="num" style="font-size:12px">${fmt(p.entry_price)} → ${fmt(p.exit_price)}</td>
+      <td class="num ${cc(p.actual_gain)}">${as}${fmt(Math.abs(p.actual_gain))} <span style="color:var(--muted);font-size:11px">(${fmtPct(p.actual_gain_pct)})</span></td>
+      <td class="num ${cc(p.net_gain)}">${as}${fmt(Math.abs(p.net_gain))}</td>
+      <td class="num ${cc(p.held_gain)}">${fmt(p.held_gain)} <span style="color:var(--muted);font-size:11px">(${fmtPct(p.held_gain_pct)})</span></td>
+      <td class="num ${oppClass}">${oppText}</td>
+      <td class="num">${termBadge}</td>
+      <td class="num">${p.days_held}d</td>
+    </tr>`;
+  }
+
+  function privateRowHTML(thesisName, p) {
+    const s = p.gain >= 0 ? '+' : '';
+    const termBadge = p.term === 'long-term'
+      ? '<span class="badge badge-blue">LT 15%</span>'
+      : '<span class="badge badge-amber">ST 24%</span>';
+    const moicBadge = `<span class="badge badge-moic">${Number(p.moic).toFixed(2)}x</span>`;
+    const notesTip = p.notes ? ` title="${esc(p.notes)}"` : '';
+    return `<tr>
+      <td class="ticker-cell"${notesTip}>${esc(p.company)}${p.notes ? ' <span style="color:var(--muted);font-size:11px" title="${esc(p.notes)}">ℹ</span>' : ''}</td>
+      <td class="num">${fmt(p.investment)}</td>
+      <td class="num" style="font-size:12px">${fmtB(p.entry_valuation)}</td>
+      <td class="num" style="font-size:12px">${fmtB(p.current_valuation)}</td>
+      <td class="num">${Number(p.implied_ownership_pct).toFixed(4)}%</td>
+      <td class="num">${fmt(p.current_value)}</td>
+      <td class="num ${cc(p.gain)}">${s}${fmt(Math.abs(p.gain))}</td>
+      <td class="num">${moicBadge}</td>
+      <td class="num">${termBadge}</td>
+      <td class="num">${p.days_held}d</td>
+      <td style="white-space:nowrap">
+        <button class="btn btn-ghost btn-sm" style="margin-right:4px"
+          onclick="openUpdatePrivate('${esc(thesisName)}','${esc(p.company)}',${p.current_valuation})">✏</button>
+        <button class="btn btn-warning btn-sm" style="margin-right:4px"
+          onclick="openClosePrivate('${esc(thesisName)}','${esc(p.company)}')">Exit</button>
+        <button class="btn btn-danger btn-sm"
+          onclick="deletePrivate('${esc(thesisName)}','${esc(p.company)}')">✕</button>
+      </td>
+    </tr>`;
+  }
+
+  function closedPrivateRowHTML(p) {
+    const s = p.actual_gain >= 0 ? '+' : '';
+    const termBadge = p.term === 'long-term'
+      ? '<span class="badge badge-blue">LT</span>'
+      : '<span class="badge badge-amber">ST</span>';
+    const moicBadge = `<span class="badge badge-moic">${Number(p.moic).toFixed(2)}x</span>`;
+    return `<tr>
+      <td class="ticker-cell">${esc(p.company)}</td>
+      <td class="num" style="font-size:12px;color:var(--muted)">${p.exit_date}</td>
+      <td class="num">${fmt(p.investment)}</td>
+      <td class="num" style="font-size:12px">${fmtB(p.entry_valuation)}</td>
+      <td class="num" style="font-size:12px">${fmtB(p.exit_valuation)}</td>
+      <td class="num ${cc(p.actual_gain)}">${s}${fmt(Math.abs(p.actual_gain))}</td>
+      <td class="num">${moicBadge}</td>
+      <td class="num ${cc(p.net_gain)}">${s}${fmt(Math.abs(p.net_gain))}</td>
+      <td class="num">${termBadge}</td>
+      <td class="num">${p.days_held}d</td>
+    </tr>`;
+  }
+
+  function toggleCard(id) {
+    document.getElementById('card-' + id).classList.toggle('open');
+  }
+
+  // ---------------------------------------------------------------------------
+  // Watchlist
+  // ---------------------------------------------------------------------------
+
+  function renderWatchlist(items) {
+    const body = document.getElementById('watchlist-body');
+    if (!items.length) {
+      body.innerHTML = '<div class="no-data">Watchlist is empty. Click <strong>+ Watchlist</strong> to add tickers.</div>';
+      return;
+    }
+    const rows = items.map(item => {
+      const d = item.day_change_pct ?? 0;
+      const s = d >= 0 ? '+' : '';
+      const pe = item.pe_ratio;
+      const div = item.dividend_yield;
+      return `<tr>
+        <td class="ticker-cell">${esc(item.ticker)}</td>
+        <td>${esc(item.name||'')}</td>
+        <td class="num">${fmt(item.price)}</td>
+        <td class="num ${cc(d)}">${s}${fmtPct(d,false)}</td>
+        <td class="num">${pe != null ? Number(pe).toFixed(1) : 'N/A'}</td>
+        <td class="num">${item.low_52w != null ? fmt(item.low_52w) : 'N/A'}</td>
+        <td class="num">${div != null ? fmtPct(div*100,false) : 'N/A'}</td>
+        <td><button class="btn btn-danger btn-sm" onclick="removeWatchlist('${esc(item.ticker)}')">✕</button></td>
+      </tr>`;
+    }).join('');
+    body.innerHTML = `<div class="table-wrap"><table>
+      <thead><tr>
+        <th>Ticker</th><th>Name</th><th class="num">Price</th><th class="num">Day %</th>
+        <th class="num">P/E</th><th class="num">52W Low</th><th class="num">Div Yield</th><th></th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table></div>`;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Modals
+  // ---------------------------------------------------------------------------
+
+  function openModal(id) { document.getElementById(id).classList.add('open'); }
+  function closeModal(id) {
+    document.getElementById(id).classList.remove('open');
+    const err = document.querySelector(`#${id} .form-error`);
+    if (err) err.textContent = '';
+  }
+  document.querySelectorAll('.overlay').forEach(el =>
+    el.addEventListener('click', e => { if (e.target === el) closeModal(el.id); })
+  );
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') document.querySelectorAll('.overlay.open').forEach(el => closeModal(el.id));
+  });
+
+  // New thesis
+  function openNewThesisModal() {
+    document.getElementById('thesis-name-input').value = '';
+    openModal('thesis-modal');
+    setTimeout(() => document.getElementById('thesis-name-input').focus(), 50);
+  }
+  async function submitNewThesis() {
+    const name = document.getElementById('thesis-name-input').value.trim();
+    const errEl = document.getElementById('thesis-modal-error');
+    if (!name) { errEl.textContent = 'Please enter a thesis name.'; return; }
+    const res = await fetch('/api/theses', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({name}),
+    });
+    if (!res.ok) { errEl.textContent = (await res.json()).detail || 'Error.'; return; }
+    closeModal('thesis-modal');
+    await loadData(true);
+    const card = document.getElementById('card-' + escId(name));
+    if (card) card.classList.add('open');
+  }
+
+  // Position type toggle
+  function setPositionType(type) {
+    _positionType = type;
+    document.getElementById('public-fields').style.display  = type === 'public'  ? 'block' : 'none';
+    document.getElementById('private-fields').style.display = type === 'private' ? 'block' : 'none';
+    document.getElementById('toggle-public').classList.toggle('active',  type === 'public');
+    document.getElementById('toggle-private').classList.toggle('active', type === 'private');
+  }
+
+  // Add position
+  function openAddPosition(thesisName=null) {
+    const sel = document.getElementById('pos-thesis');
+    sel.innerHTML = _theses.map(t =>
+      `<option value="${esc(t.name)}" ${t.name===thesisName?'selected':''}>${esc(t.name)}</option>`
+    ).join('');
+    ['pos-ticker','pos-shares','pos-price','pos-entry-date','priv-company','priv-investment',
+     'priv-entry-val','priv-current-val','priv-entry-date','priv-notes'].forEach(id => {
+      const el = document.getElementById(id); if (el) el.value = '';
+    });
+    document.getElementById('pos-modal-error').textContent = '';
+    setPositionType('public');
+    openModal('position-modal');
+    setTimeout(() => document.getElementById('pos-ticker').focus(), 50);
+  }
+
+  async function submitPosition() {
+    const thesis = document.getElementById('pos-thesis').value;
+    const errEl  = document.getElementById('pos-modal-error');
+    const btn    = document.getElementById('pos-submit-btn');
+
+    if (_positionType === 'private') {
+      const company   = document.getElementById('priv-company').value.trim();
+      const investment = parseFloat(document.getElementById('priv-investment').value);
+      const entryVal   = parseFloat(document.getElementById('priv-entry-val').value);
+      const currValRaw = document.getElementById('priv-current-val').value.trim();
+      const currentValuation = currValRaw ? parseFloat(currValRaw) : null;
+      const privEntryDate = document.getElementById('priv-entry-date').value || null;
+      const notes = document.getElementById('priv-notes').value.trim();
+      if (!company)           { errEl.textContent = 'Enter a company name.'; return; }
+      if (!investment || investment <= 0) { errEl.textContent = 'Enter a valid investment amount.'; return; }
+      if (!entryVal  || entryVal  <= 0)  { errEl.textContent = 'Enter a valid entry valuation.'; return; }
+      btn.disabled = true; btn.textContent = 'Saving…';
+      const res = await fetch(`/api/theses/${encodeURIComponent(thesis)}/private-positions`, {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({company, investment, entry_valuation: entryVal, current_valuation: currentValuation, notes, entry_date: privEntryDate}),
+      });
+      btn.disabled = false; btn.textContent = 'Add Position';
+      if (!res.ok) { errEl.textContent = (await res.json()).detail || 'Error.'; return; }
+    } else {
+      const ticker = document.getElementById('pos-ticker').value.trim().toUpperCase();
+      const shares = parseFloat(document.getElementById('pos-shares').value);
+      const priceRaw = document.getElementById('pos-price').value.trim();
+      const price = priceRaw ? parseFloat(priceRaw) : null;
+      const entryDate = document.getElementById('pos-entry-date').value || null;
+      if (!ticker)             { errEl.textContent = 'Enter a ticker symbol.'; return; }
+      if (!shares || shares<=0){ errEl.textContent = 'Enter a valid share count.'; return; }
+      btn.disabled = true; btn.textContent = 'Fetching price…';
+      const res = await fetch(`/api/theses/${encodeURIComponent(thesis)}/positions`, {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ticker, shares, price, entry_date: entryDate}),
+      });
+      btn.disabled = false; btn.textContent = 'Add Position';
+      if (!res.ok) { errEl.textContent = (await res.json()).detail || 'Error.'; return; }
+    }
+
+    closeModal('position-modal');
+    await loadData(true);
+    const card = document.getElementById('card-' + escId(thesis));
+    if (card) card.classList.add('open');
+  }
+
+  // Close position
+  function openCloseModal(thesis, ticker, currentPrice) {
+    _closeTarget = {thesis, ticker};
+    document.getElementById('close-modal-subtitle').textContent =
+      `Closing ${ticker} in "${thesis}". Current market price: ${fmt(currentPrice)}`;
+    document.getElementById('close-price').value = '';
+    document.getElementById('close-modal-error').textContent = '';
+    openModal('close-modal');
+    setTimeout(() => document.getElementById('close-price').focus(), 50);
+  }
+  async function submitClose() {
+    const priceRaw = document.getElementById('close-price').value.trim();
+    const exit_price = priceRaw ? parseFloat(priceRaw) : null;
+    const errEl = document.getElementById('close-modal-error');
+    const btn = document.getElementById('close-submit-btn');
+    btn.disabled = true; btn.textContent = 'Closing…';
+    const {thesis, ticker} = _closeTarget;
+    const res = await fetch(`/api/theses/${encodeURIComponent(thesis)}/positions/${encodeURIComponent(ticker)}/close`, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({exit_price}),
+    });
+    btn.disabled = false; btn.textContent = 'Close Position';
+    if (!res.ok) { errEl.textContent = (await res.json()).detail || 'Error.'; return; }
+    closeModal('close-modal');
+    await loadData(true);
+    const card = document.getElementById('card-' + escId(thesis));
+    if (card) card.classList.add('open');
+  }
+
+  // Delete position (no history)
+  async function deletePosition(thesis, ticker) {
+    if (!confirm(`Permanently delete ${ticker} from "${thesis}"? This removes it with no history saved.`)) return;
+    await fetch(`/api/theses/${encodeURIComponent(thesis)}/positions/${encodeURIComponent(ticker)}`, {method:'DELETE'});
+    await loadData(true);
+  }
+
+  // Update private valuation
+  function openUpdatePrivate(thesis, company, currentVal) {
+    _updatePrivTarget = {thesis, company};
+    document.getElementById('update-private-subtitle').textContent =
+      `Updating DCF valuation for ${company} in "${thesis}". Current: ${fmtB(currentVal)}`;
+    document.getElementById('update-val-input').value = '';
+    document.getElementById('update-notes-input').value = '';
+    document.getElementById('update-private-error').textContent = '';
+    openModal('update-private-modal');
+    setTimeout(() => document.getElementById('update-val-input').focus(), 50);
+  }
+  async function submitUpdatePrivate() {
+    const val = parseFloat(document.getElementById('update-val-input').value);
+    const notes = document.getElementById('update-notes-input').value.trim() || null;
+    const errEl = document.getElementById('update-private-error');
+    if (!val || val <= 0) { errEl.textContent = 'Enter a valid valuation.'; return; }
+    const btn = document.getElementById('update-private-btn');
+    btn.disabled = true; btn.textContent = 'Saving…';
+    const {thesis, company} = _updatePrivTarget;
+    const res = await fetch(`/api/theses/${encodeURIComponent(thesis)}/private-positions/${encodeURIComponent(company)}`, {
+      method: 'PATCH', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({current_valuation: val, notes}),
+    });
+    btn.disabled = false; btn.textContent = 'Update';
+    if (!res.ok) { errEl.textContent = (await res.json()).detail || 'Error.'; return; }
+    closeModal('update-private-modal');
+    await loadData(true);
+    const card = document.getElementById('card-' + escId(thesis));
+    if (card) card.classList.add('open');
+  }
+
+  // Close / exit private
+  function openClosePrivate(thesis, company) {
+    _closePrivTarget = {thesis, company};
+    document.getElementById('close-private-subtitle').textContent =
+      `Recording an exit for ${company} in "${thesis}".`;
+    document.getElementById('close-private-val').value = '';
+    document.getElementById('close-private-error').textContent = '';
+    openModal('close-private-modal');
+    setTimeout(() => document.getElementById('close-private-val').focus(), 50);
+  }
+  async function submitClosePrivate() {
+    const val = parseFloat(document.getElementById('close-private-val').value);
+    const errEl = document.getElementById('close-private-error');
+    if (!val || val <= 0) { errEl.textContent = 'Enter the exit valuation.'; return; }
+    const btn = document.getElementById('close-private-btn');
+    btn.disabled = true; btn.textContent = 'Saving…';
+    const {thesis, company} = _closePrivTarget;
+    const res = await fetch(`/api/theses/${encodeURIComponent(thesis)}/private-positions/${encodeURIComponent(company)}/close`, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({exit_valuation: val}),
+    });
+    btn.disabled = false; btn.textContent = 'Record Exit';
+    if (!res.ok) { errEl.textContent = (await res.json()).detail || 'Error.'; return; }
+    closeModal('close-private-modal');
+    await loadData(true);
+    const card = document.getElementById('card-' + escId(thesis));
+    if (card) card.classList.add('open');
+  }
+
+  async function deletePrivate(thesis, company) {
+    if (!confirm(`Permanently delete "${company}" from "${thesis}"? No history will be saved.`)) return;
+    await fetch(`/api/theses/${encodeURIComponent(thesis)}/private-positions/${encodeURIComponent(company)}`, {method:'DELETE'});
+    await loadData(true);
+  }
+
+  // Watchlist
+  function openWatchlistModal() {
+    document.getElementById('wl-ticker').value = '';
+    document.getElementById('wl-modal-error').textContent = '';
+    openModal('watchlist-modal');
+    setTimeout(() => document.getElementById('wl-ticker').focus(), 50);
+  }
+  async function submitWatchlist() {
+    const ticker = document.getElementById('wl-ticker').value.trim().toUpperCase();
+    const errEl = document.getElementById('wl-modal-error');
+    if (!ticker) { errEl.textContent = 'Enter a ticker symbol.'; return; }
+    const res = await fetch('/api/watchlist', {
+      method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ticker}),
+    });
+    if (!res.ok) { errEl.textContent = (await res.json()).detail || 'Error.'; return; }
+    closeModal('watchlist-modal');
+    await loadData(true);
+  }
+  async function removeWatchlist(ticker) {
+    if (!confirm(`Remove ${ticker} from watchlist?`)) return;
+    await fetch(`/api/watchlist/${encodeURIComponent(ticker)}`, {method:'DELETE'});
+    await loadData(true);
+  }
+
+  // Enter key shortcuts
+  document.getElementById('thesis-name-input').addEventListener('keydown', e => { if(e.key==='Enter') submitNewThesis(); });
+  document.getElementById('wl-ticker').addEventListener('keydown',         e => { if(e.key==='Enter') submitWatchlist(); });
+  document.getElementById('close-price').addEventListener('keydown',       e => { if(e.key==='Enter') submitClose(); });
+
+  // ---------------------------------------------------------------------------
+  // Utilities
+  // ---------------------------------------------------------------------------
+
+  function esc(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+  function escId(s) { return String(s).replace(/[^a-zA-Z0-9]/g,'_'); }
+
+  // ---------------------------------------------------------------------------
+  // Boot
+  // ---------------------------------------------------------------------------
+  loadData();
+</script>
+</body>
+</html>
