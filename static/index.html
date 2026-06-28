@@ -148,7 +148,8 @@
              display: none; align-items: center; justify-content: center; z-index: 200; }
   .overlay.open { display: flex; }
   .modal { background: var(--surface); border-radius: var(--radius); padding: 28px;
-           width: 460px; max-width: 95vw; box-shadow: 0 20px 60px rgba(0,0,0,.2); }
+           width: 460px; max-width: 95vw; box-shadow: 0 20px 60px rgba(0,0,0,.2);
+           max-height: 90vh; overflow-y: auto; }
   .modal-title { font-size: 16px; font-weight: 700; margin-bottom: 6px; }
   .modal-subtitle { font-size: 13px; color: var(--muted); margin-bottom: 20px; }
   .modal-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px; }
@@ -374,23 +375,39 @@
       </div>
       <div class="form-group">
         <label>Simulated Investment ($)</label>
-        <input id="priv-investment" type="number" min="0" step="any" placeholder="50000" />
+        <input id="priv-investment" type="number" min="0" step="any" placeholder="$50,000.00" />
         <div class="form-hint">The dollar amount you are simulating investing.</div>
       </div>
       <div class="form-group">
         <label>Company Valuation at Entry ($)</label>
-        <input id="priv-entry-val" type="number" min="0" step="any" placeholder="5000000000  ($5B)" />
-        <div class="form-hint">Sets your implied ownership %. E.g. 5,000,000,000 = $5B.</div>
+        <input id="priv-entry-val" type="number" min="0" step="any" placeholder="$500,000,000.00" />
+        <div class="form-hint">Sets your implied ownership %. e.g. $500,000,000.00 = $500M.</div>
       </div>
       <div class="form-group">
         <label>Current DCF Valuation ($) — optional</label>
-        <input id="priv-current-val" type="number" min="0" step="any" placeholder="Same as entry" />
+        <input id="priv-current-val" type="number" min="0" step="any" placeholder="Same as entry valuation" />
         <div class="form-hint">Leave blank to start at entry valuation. Update later with your DCF.</div>
       </div>
       <div class="form-group">
         <label>Entry Date (optional)</label>
         <input id="priv-entry-date" type="date" />
         <div class="form-hint">Backdate to simulate a past investment. Defaults to today.</div>
+      </div>
+      <div class="form-group">
+        <label>Expected Liquidity Date (optional)</label>
+        <input id="priv-liquidity-date" type="date" />
+        <div class="form-hint">Target date for IPO, acquisition, or other liquidity event.</div>
+      </div>
+      <div class="form-group">
+        <label>Liquidity Event Type (optional)</label>
+        <select id="priv-liquidity-type">
+          <option value="">— Select type —</option>
+          <option value="IPO">IPO</option>
+          <option value="Acquisition">Acquisition</option>
+          <option value="Secondary">Secondary Sale</option>
+          <option value="Write-down">Write-down</option>
+          <option value="Other">Other</option>
+        </select>
       </div>
       <div class="form-group">
         <label>Notes (DCF assumptions, thesis rationale)</label>
@@ -431,8 +448,8 @@
     <div class="modal-subtitle" id="update-private-subtitle"></div>
     <div class="form-group">
       <label>New Company Valuation ($)</label>
-      <input id="update-val-input" type="number" min="0" step="any" placeholder="7000000000  ($7B)" />
-      <div class="form-hint">Your latest DCF estimate for the company's total valuation.</div>
+      <input id="update-val-input" type="number" min="0" step="any" placeholder="$700,000,000.00" />
+      <div class="form-hint">Your latest DCF estimate for the company's total valuation. e.g. $700,000,000.00 = $700M.</div>
     </div>
     <div class="form-group">
       <label>Update Notes (optional)</label>
@@ -453,8 +470,8 @@
     <div class="modal-subtitle" id="close-private-subtitle"></div>
     <div class="form-group">
       <label>Exit Valuation ($)</label>
-      <input id="close-private-val" type="number" min="0" step="any" placeholder="Acquisition / IPO valuation" />
-      <div class="form-hint">The company's total valuation at exit (acquisition price, IPO market cap, write-down, etc.).</div>
+      <input id="close-private-val" type="number" min="0" step="any" placeholder="$500,000,000.00" />
+      <div class="form-hint">The company's total valuation at exit. e.g. $500,000,000.00 = $500M (acquisition price, IPO market cap, write-down, etc.).</div>
     </div>
     <div class="form-error" id="close-private-error"></div>
     <div class="modal-footer">
@@ -702,7 +719,9 @@
             <th>Company</th><th class="num">Invested</th><th class="num">Entry Val</th>
             <th class="num">Current Val</th><th class="num">Impl. Own%</th>
             <th class="num">Curr Value</th><th class="num">Gain</th>
-            <th class="num">MOIC</th><th class="num">Cap Gains</th><th class="num">Days</th><th></th>
+            <th class="num">MOIC</th><th class="num">Proj. IRR</th>
+            <th class="num">Expected Exit</th><th class="num">Time Left</th>
+            <th class="num">Cap Gains</th><th class="num">Days</th><th></th>
           </tr></thead>
           <tbody>${rows}</tbody>
         </table></div>`;
@@ -830,6 +849,31 @@
       : '<span class="badge badge-amber">ST 24%</span>';
     const moicBadge = `<span class="badge badge-moic">${Number(p.moic).toFixed(2)}x</span>`;
     const notesTip  = p.notes ? ` title="${esc(p.notes)}"` : '';
+
+    // Projected IRR
+    let irrHtml = '<span style="color:var(--muted);font-size:12px">—</span>';
+    if (p.projected_irr != null) {
+      const irrPct  = p.projected_irr * 100;
+      const irrCls  = irrPct >= 0 ? 'badge-green' : 'badge-red';
+      const irrSign = irrPct >= 0 ? '+' : '';
+      irrHtml = `<span class="badge ${irrCls}">${irrSign}${irrPct.toFixed(1)}%</span>`;
+    }
+
+    // Expected exit
+    const exitType = p.liquidity_event_type || '';
+    const exitDate = p.expected_liquidity_date || '';
+    let exitHtml = '<span style="color:var(--muted);font-size:12px">—</span>';
+    if (exitDate) {
+      exitHtml = `<span style="font-size:12px">${exitDate}${exitType ? `<br><span style="color:var(--muted)">${esc(exitType)}</span>` : ''}</span>`;
+    }
+
+    // Time remaining
+    let timeHtml = '<span style="color:var(--muted);font-size:12px">—</span>';
+    if (p.time_to_liquidity) {
+      const isPast = p.time_to_liquidity === 'Past due';
+      timeHtml = `<span class="badge ${isPast ? 'badge-red' : 'badge-blue'}">${p.time_to_liquidity}</span>`;
+    }
+
     return `<tr>
       <td class="ticker-cell"${notesTip}>${esc(p.company)}</td>
       <td class="num">${fmt(p.investment)}</td>
@@ -839,6 +883,9 @@
       <td class="num">${fmt(p.current_value)}</td>
       <td class="num ${cc(p.gain)}">${s}${fmt(Math.abs(p.gain))}</td>
       <td class="num">${moicBadge}</td>
+      <td class="num">${irrHtml}</td>
+      <td class="num">${exitHtml}</td>
+      <td class="num">${timeHtml}</td>
       <td class="num">${termBadge}</td>
       <td class="num">${p.days_held}d</td>
       <td style="white-space:nowrap">
@@ -1005,7 +1052,8 @@
       `<option value="${esc(t.name)}" ${t.name===thesisName?'selected':''}>${esc(t.name)}</option>`
     ).join('');
     ['pos-ticker','pos-shares','pos-price','pos-entry-date','priv-company','priv-investment',
-     'priv-entry-val','priv-current-val','priv-entry-date','priv-notes'].forEach(id => {
+     'priv-entry-val','priv-current-val','priv-entry-date','priv-liquidity-date',
+     'priv-liquidity-type','priv-notes'].forEach(id => {
       const el = document.getElementById(id); if (el) el.value = '';
     });
     document.getElementById('pos-modal-error').textContent = '';
@@ -1025,7 +1073,9 @@
       const entryVal   = parseFloat(document.getElementById('priv-entry-val').value);
       const currValRaw = document.getElementById('priv-current-val').value.trim();
       const currentValuation = currValRaw ? parseFloat(currValRaw) : null;
-      const privEntryDate    = document.getElementById('priv-entry-date').value || null;
+      const privEntryDate       = document.getElementById('priv-entry-date').value || null;
+      const liquidityDate       = document.getElementById('priv-liquidity-date').value || null;
+      const liquidityEventType  = document.getElementById('priv-liquidity-type').value || '';
       const notes = document.getElementById('priv-notes').value.trim();
       if (!company)                          { errEl.textContent = 'Enter a company name.'; return; }
       if (!investment || investment <= 0)    { errEl.textContent = 'Enter a valid investment amount.'; return; }
@@ -1034,7 +1084,9 @@
       const res = await authFetch(`/api/theses/${encodeURIComponent(thesis)}/private-positions`, {
         method: 'POST',
         body: JSON.stringify({ company, investment, entry_valuation: entryVal,
-                               current_valuation: currentValuation, notes, entry_date: privEntryDate }),
+                               current_valuation: currentValuation, notes, entry_date: privEntryDate,
+                               expected_liquidity_date: liquidityDate,
+                               liquidity_event_type: liquidityEventType }),
       });
       btn.disabled = false; btn.textContent = 'Add Position';
       if (!res.ok) { errEl.textContent = (await res.json()).detail || 'Error.'; return; }

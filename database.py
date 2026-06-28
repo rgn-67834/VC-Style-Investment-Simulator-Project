@@ -60,14 +60,16 @@ def init_db() -> None:
             );
 
             CREATE TABLE IF NOT EXISTS private_positions (
-                id                  INTEGER PRIMARY KEY AUTOINCREMENT,
-                thesis_id           INTEGER NOT NULL REFERENCES theses(id) ON DELETE CASCADE,
-                company             TEXT    NOT NULL,
-                investment          REAL    NOT NULL,
-                entry_valuation     REAL    NOT NULL,
-                current_valuation   REAL    NOT NULL,
-                entry_date          TEXT    NOT NULL,
-                notes               TEXT    NOT NULL DEFAULT '',
+                id                       INTEGER PRIMARY KEY AUTOINCREMENT,
+                thesis_id                INTEGER NOT NULL REFERENCES theses(id) ON DELETE CASCADE,
+                company                  TEXT    NOT NULL,
+                investment               REAL    NOT NULL,
+                entry_valuation          REAL    NOT NULL,
+                current_valuation        REAL    NOT NULL,
+                entry_date               TEXT    NOT NULL,
+                notes                    TEXT    NOT NULL DEFAULT '',
+                expected_liquidity_date  TEXT,
+                liquidity_event_type     TEXT    NOT NULL DEFAULT '',
                 UNIQUE (thesis_id, company)
             );
 
@@ -91,6 +93,17 @@ def init_db() -> None:
                 UNIQUE (user_id, ticker)
             );
         """)
+    # Add columns introduced after initial schema — safe to run repeatedly
+    with get_conn() as conn:
+        for sql in [
+            "ALTER TABLE private_positions ADD COLUMN expected_liquidity_date TEXT",
+            "ALTER TABLE private_positions ADD COLUMN liquidity_event_type TEXT NOT NULL DEFAULT ''",
+        ]:
+            try:
+                conn.execute(sql)
+            except Exception:
+                pass  # column already exists
+
     migrate_from_json()
 
 

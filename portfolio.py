@@ -187,6 +187,8 @@ def add_private_position(
     current_valuation: Optional[float] = None,
     notes: str = "",
     entry_date: Optional[str] = None,
+    expected_liquidity_date: Optional[str] = None,
+    liquidity_event_type: str = "",
 ) -> None:
     if entry_date:
         try:
@@ -199,14 +201,22 @@ def add_private_position(
     if current_valuation is None:
         current_valuation = entry_valuation
 
+    if expected_liquidity_date:
+        try:
+            date.fromisoformat(expected_liquidity_date)
+        except ValueError:
+            raise ValueError(f"Invalid expected_liquidity_date '{expected_liquidity_date}'. Use YYYY-MM-DD.")
+
     with get_conn() as conn:
         thesis_id = _get_thesis_id(conn, user_id, thesis_name)
         try:
             conn.execute(
                 "INSERT INTO private_positions "
-                "(thesis_id, company, investment, entry_valuation, current_valuation, entry_date, notes) "
-                "VALUES (?,?,?,?,?,?,?)",
-                (thesis_id, company, investment, entry_valuation, current_valuation, entry_date, notes)
+                "(thesis_id, company, investment, entry_valuation, current_valuation, entry_date, notes, "
+                "expected_liquidity_date, liquidity_event_type) "
+                "VALUES (?,?,?,?,?,?,?,?,?)",
+                (thesis_id, company, investment, entry_valuation, current_valuation, entry_date, notes,
+                 expected_liquidity_date, liquidity_event_type)
             )
         except Exception:
             raise ValueError(f"'{company}' already exists in '{thesis_name}'.")
@@ -285,28 +295,71 @@ def delete_private_position(user_id: int, thesis_name: str, company: str) -> Non
 # Enrichment helpers
 # ---------------------------------------------------------------------------
 
+def _time_to_liquidity(liquidity_date_str: Optional[str]) -> dict:
+    """Compute time-to-liquidity metrics from an expected liquidity date."""
+    if not liquidity_date_str:
+        return {"years_to_liquidity": None, "time_to_liquidity": None, "pct_hold_elapsed": None}
+
+    today = date.today()
+    liq   = date.fromisoformat(liquidity_date_str)
+    days_remaining = (liq - today).days
+    years_remaining = days_remaining / 365.25
+
+    if days_remaining < 0:
+        time_str = "Past due"
+    else:
+        y = int(years_remaining)
+        m = int((years_remaining - y) * 12)
+        parts = []
+        if y: parts.append(f"{y}y")
+        if m: parts.append(f"{m}m")
+        time_str = " ".join(parts) if parts else "< 1m"
+
+    return {
+        "years_to_liquidity": years_remaining,
+        "time_to_liquidity":  time_str,
+    }
+
+
+def _projected_irr(current_value: float, investment: float,
+                   years_to_liquidity: Optional[float]) -> Optional[float]:
+    """CAGR from today to expected liquidity at current implied value."""
+    if years_to_liquidity is None or years_to_liquidity <= 0 or investment <= 0:
+        return None
+    try:
+        return (current_value / investment) ** (1 / years_to_liquidity) - 1
+    except Exception:
+        return None
+
+
 def _enrich_private(pos) -> dict:
     pos = dict(pos)
-    investment = pos["investment"]
-    entry_val  = pos["entry_valuation"]
+    investment  = pos["investment"]
+    entry_val   = pos["entry_valuation"]
     current_val = pos["current_valuation"]
     entry_date  = pos["entry_date"]
+    liq_date    = pos.get("expected_liquidity_date")
 
     implied_ownership = investment / entry_val if entry_val else 0
     current_value = implied_ownership * current_val
-    gain = current_value - investment
+    gain     = current_value - investment
     gain_pct = (gain / investment * 100) if investment else 0.0
-    days = (date.today() - date.fromisoformat(entry_date)).days
-    moic = current_value / investment if investment else 1.0
+    days     = (date.today() - date.fromisoformat(entry_date)).days
+    moic     = current_value / investment if investment else 1.0
+
+    liq_metrics  = _time_to_liquidity(liq_date)
+    proj_irr     = _projected_irr(current_value, investment, liq_metrics["years_to_liquidity"])
 
     return {
         **pos,
         "implied_ownership_pct": implied_ownership * 100,
-        "current_value": current_value,
-        "gain": gain,
-        "gain_pct": gain_pct,
-        "moic": moic,
-        "days_held": days,
+        "current_value":   current_value,
+        "gain":            gain,
+        "gain_pct":        gain_pct,
+        "moic":            moic,
+        "days_held":       days,
+        "projected_irr":   proj_irr,
+        **liq_metrics,
         **_cap_gains(gain, days),
     }
 

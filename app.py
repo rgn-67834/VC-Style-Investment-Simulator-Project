@@ -230,6 +230,8 @@ class NewPrivateBody(BaseModel):
     current_valuation: Optional[float] = None
     notes: str = ""
     entry_date: Optional[str] = None
+    expected_liquidity_date: Optional[str] = None
+    liquidity_event_type: str = ""
 
 
 @app.post("/api/theses/{thesis_name}/private-positions", status_code=201)
@@ -238,7 +240,8 @@ def api_add_private(thesis_name: str, body: NewPrivateBody,
     try:
         add_private_position(
             current_user["id"], thesis_name, body.company, body.investment,
-            body.entry_valuation, body.current_valuation, body.notes, body.entry_date
+            body.entry_valuation, body.current_valuation, body.notes, body.entry_date,
+            body.expected_liquidity_date, body.liquidity_event_type,
         )
     except ValueError as e:
         raise HTTPException(400, str(e))
