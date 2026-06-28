@@ -6,6 +6,7 @@ and sends it via SMTP.
 import os
 import smtplib
 from datetime import date
+from typing import Optional
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from dotenv import load_dotenv
@@ -222,7 +223,7 @@ def build_html(theses: list[dict], watchlist_data: list[dict]) -> str:
 # Send
 # ---------------------------------------------------------------------------
 
-def send_email(html: str, subject: str = None) -> bool:
+def send_email(html: str, subject: Optional[str] = None) -> bool:
     sender = os.getenv("EMAIL_SENDER", "")
     password = os.getenv("EMAIL_APP_PASSWORD", "")
     recipient = os.getenv("EMAIL_RECIPIENT", sender)
