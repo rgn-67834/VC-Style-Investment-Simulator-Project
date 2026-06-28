@@ -7,7 +7,7 @@ import os
 import sqlite3
 from pathlib import Path
 
-DB_PATH = Path(__file__).parent / "tracker.db"
+DB_PATH = Path(os.getenv("DB_DIR", Path(__file__).parent)) / "tracker.db"
 _PORTFOLIOS_JSON = Path(__file__).parent / "portfolios.json"
 _WATCHLIST_JSON  = Path(__file__).parent / "watchlist.json"
 
