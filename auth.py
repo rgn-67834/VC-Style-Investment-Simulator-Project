@@ -7,8 +7,8 @@ from datetime import datetime, timedelta, timezone
 
 from fastapi import Depends, HTTPException
 from fastapi.security import OAuth2PasswordBearer
+import bcrypt as _bcrypt
 from jose import JWTError, jwt
-from passlib.context import CryptContext
 
 from database import get_conn
 
@@ -19,16 +19,15 @@ if not SECRET_KEY:
 ALGORITHM = "HS256"
 TOKEN_EXPIRE_DAYS = 7
 
-_pwd_ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
 _oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 
 
 def hash_password(plain: str) -> str:
-    return _pwd_ctx.hash(plain)
+    return _bcrypt.hashpw(plain[:72].encode(), _bcrypt.gensalt()).decode()
 
 
 def verify_password(plain: str, hashed: str) -> bool:
-    return _pwd_ctx.verify(plain, hashed)
+    return _bcrypt.checkpw(plain[:72].encode(), hashed.encode())
 
 
 def create_access_token(user_id: int, username: str) -> str:

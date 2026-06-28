@@ -99,8 +99,7 @@ def migrate_from_json() -> None:
     if not _PORTFOLIOS_JSON.exists() and not _WATCHLIST_JSON.exists():
         return
 
-    from passlib.context import CryptContext
-    _pwd = CryptContext(schemes=["bcrypt"], deprecated="auto")
+    import bcrypt as _bcrypt
 
     with get_conn() as conn:
         default_password = os.getenv("MIGRATE_DEFAULT_PASSWORD", "changeme")
@@ -108,9 +107,10 @@ def migrate_from_json() -> None:
         if existing:
             user_id = existing["id"]
         else:
+            pw_hash = _bcrypt.hashpw(default_password[:72].encode(), _bcrypt.gensalt()).decode()
             cur = conn.execute(
                 "INSERT INTO users (username, password_hash) VALUES ('admin', ?)",
-                (_pwd.hash(default_password),)
+                (pw_hash,)
             )
             user_id = cur.lastrowid
             print(f"[migrate] Created default user 'admin' (password: {default_password})")
