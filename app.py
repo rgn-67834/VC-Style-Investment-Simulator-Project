@@ -65,7 +65,8 @@ def _bust(user_id: int) -> None:
 
 @app.get("/", response_class=HTMLResponse)
 def root():
-    return Path("static/index.html").read_text(encoding="utf-8")
+    content = Path("static/index.html").read_text(encoding="utf-8")
+    return HTMLResponse(content=content, headers={"Cache-Control": "no-store"})
 
 
 # ---------------------------------------------------------------------------
@@ -119,7 +120,11 @@ def api_login(body: LoginBody):
 
 @app.get("/api/auth/me")
 def api_me(current_user: dict = Depends(get_current_user)):
-    return {"id": current_user["id"], "username": current_user["username"]}
+    return {
+        "id": current_user["id"],
+        "username": current_user["username"],
+        "is_admin": bool(current_user.get("is_admin")),
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -381,4 +386,123 @@ def delete_attachment(attachment_id: int, current_user: dict = Depends(get_curre
         )
     if cur.rowcount == 0:
         raise HTTPException(404, "Attachment not found.")
+    return {"ok": True}
+
+
+# ---------------------------------------------------------------------------
+# Company profiles
+# ---------------------------------------------------------------------------
+
+class CompanyBody(BaseModel):
+    name: str
+    ticker: Optional[str] = None
+    company_type: str = "public"
+    description: str = ""
+    sector: str = ""
+    industry: str = ""
+    stage: str = ""
+    founded_year: Optional[int] = None
+    headquarters: str = ""
+    website: str = ""
+    employee_count: str = ""
+
+
+@app.get("/api/companies")
+def api_list_companies(search: str = "",
+                       current_user: dict = Depends(get_current_user)):
+    with get_conn() as conn:
+        if search.strip():
+            pat = f"%{search.strip()}%"
+            rows = conn.execute(
+                "SELECT * FROM companies WHERE name LIKE ? OR ticker LIKE ? OR sector LIKE ? "
+                "ORDER BY is_verified DESC, name",
+                (pat, pat, pat),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT * FROM companies ORDER BY is_verified DESC, name"
+            ).fetchall()
+    return [dict(r) for r in rows]
+
+
+@app.post("/api/companies", status_code=201)
+def api_create_company(body: CompanyBody,
+                       current_user: dict = Depends(get_current_user)):
+    with get_conn() as conn:
+        try:
+            cur = conn.execute(
+                "INSERT INTO companies (name, ticker, company_type, description, sector, industry, "
+                "stage, founded_year, headquarters, website, employee_count, created_by) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+                (body.name.strip(),
+                 body.ticker.strip().upper() if body.ticker else None,
+                 body.company_type, body.description, body.sector, body.industry,
+                 body.stage, body.founded_year, body.headquarters,
+                 body.website, body.employee_count, current_user["id"]),
+            )
+        except Exception:
+            raise HTTPException(400, f"A company named '{body.name.strip()}' already exists.")
+    return {"ok": True, "id": cur.lastrowid}
+
+
+@app.patch("/api/companies/{company_id}")
+def api_update_company(company_id: int, body: CompanyBody,
+                       current_user: dict = Depends(get_current_user)):
+    with get_conn() as conn:
+        row = conn.execute("SELECT * FROM companies WHERE id=?", (company_id,)).fetchone()
+        if not row:
+            raise HTTPException(404, "Company not found.")
+        if not current_user.get("is_admin") and row["created_by"] != current_user["id"]:
+            raise HTTPException(403, "You can only edit companies you created.")
+        conn.execute(
+            "UPDATE companies SET name=?, ticker=?, company_type=?, description=?, sector=?, "
+            "industry=?, stage=?, founded_year=?, headquarters=?, website=?, employee_count=?, "
+            "updated_at=datetime('now') WHERE id=?",
+            (body.name.strip(),
+             body.ticker.strip().upper() if body.ticker else None,
+             body.company_type, body.description, body.sector, body.industry,
+             body.stage, body.founded_year, body.headquarters,
+             body.website, body.employee_count, company_id),
+        )
+    return {"ok": True}
+
+
+@app.post("/api/companies/{company_id}/verify")
+def api_verify_company(company_id: int,
+                       current_user: dict = Depends(get_current_user)):
+    if not current_user.get("is_admin"):
+        raise HTTPException(403, "Only administrators can verify companies.")
+    with get_conn() as conn:
+        cur = conn.execute(
+            "UPDATE companies SET is_verified=1, verified_at=datetime('now'), verified_by=? WHERE id=?",
+            (current_user["username"], company_id),
+        )
+    if cur.rowcount == 0:
+        raise HTTPException(404, "Company not found.")
+    return {"ok": True}
+
+
+@app.post("/api/companies/{company_id}/unverify")
+def api_unverify_company(company_id: int,
+                         current_user: dict = Depends(get_current_user)):
+    if not current_user.get("is_admin"):
+        raise HTTPException(403, "Only administrators can modify verification.")
+    with get_conn() as conn:
+        conn.execute(
+            "UPDATE companies SET is_verified=0, verified_at=NULL, verified_by=NULL WHERE id=?",
+            (company_id,),
+        )
+    return {"ok": True}
+
+
+@app.delete("/api/companies/{company_id}")
+def api_delete_company(company_id: int,
+                       current_user: dict = Depends(get_current_user)):
+    with get_conn() as conn:
+        row = conn.execute("SELECT * FROM companies WHERE id=?", (company_id,)).fetchone()
+        if not row:
+            raise HTTPException(404, "Company not found.")
+        if not current_user.get("is_admin") and row["created_by"] != current_user["id"]:
+            raise HTTPException(403, "You can only delete companies you created.")
+        conn.execute("DELETE FROM companies WHERE id=?", (company_id,))
     return {"ok": True}

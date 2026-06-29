@@ -94,6 +94,27 @@ def init_db() -> None:
                 UNIQUE (user_id, ticker)
             );
 
+            CREATE TABLE IF NOT EXISTS companies (
+                id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                name            TEXT    NOT NULL UNIQUE,
+                ticker          TEXT,
+                company_type    TEXT    NOT NULL DEFAULT 'public',
+                description     TEXT    NOT NULL DEFAULT '',
+                sector          TEXT    NOT NULL DEFAULT '',
+                industry        TEXT    NOT NULL DEFAULT '',
+                stage           TEXT    NOT NULL DEFAULT '',
+                founded_year    INTEGER,
+                headquarters    TEXT    NOT NULL DEFAULT '',
+                website         TEXT    NOT NULL DEFAULT '',
+                employee_count  TEXT    NOT NULL DEFAULT '',
+                is_verified     INTEGER NOT NULL DEFAULT 0,
+                verified_at     TEXT,
+                verified_by     TEXT,
+                created_by      INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                created_at      TEXT    NOT NULL DEFAULT (datetime('now')),
+                updated_at      TEXT    NOT NULL DEFAULT (datetime('now'))
+            );
+
             CREATE TABLE IF NOT EXISTS attachments (
                 id           INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -112,6 +133,7 @@ def init_db() -> None:
             "ALTER TABLE private_positions ADD COLUMN expected_liquidity_date TEXT",
             "ALTER TABLE private_positions ADD COLUMN liquidity_event_type TEXT NOT NULL DEFAULT ''",
             "ALTER TABLE positions ADD COLUMN notes TEXT NOT NULL DEFAULT ''",
+            "ALTER TABLE users ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0",
         ]:
             try:
                 conn.execute(sql)
@@ -119,6 +141,109 @@ def init_db() -> None:
                 pass  # column already exists
 
     migrate_from_json()
+    seed_companies()
+
+
+_MAG7 = [
+    {
+        "name": "Apple Inc.", "ticker": "AAPL", "company_type": "public",
+        "sector": "Technology", "industry": "Consumer Electronics",
+        "founded_year": 1976, "headquarters": "Cupertino, CA",
+        "website": "https://www.apple.com", "employee_count": "161,000+",
+        "description": (
+            "Designs, manufactures, and markets smartphones, personal computers, tablets, "
+            "wearables, and accessories. Also sells software, services, and third-party digital "
+            "content. Products include iPhone, Mac, iPad, Apple Watch, and Apple TV."
+        ),
+    },
+    {
+        "name": "Microsoft Corporation", "ticker": "MSFT", "company_type": "public",
+        "sector": "Technology", "industry": "Software & Cloud",
+        "founded_year": 1975, "headquarters": "Redmond, WA",
+        "website": "https://www.microsoft.com", "employee_count": "228,000+",
+        "description": (
+            "Develops, licenses, and supports software, services, devices, and solutions. "
+            "Segments include Productivity & Business Processes (Office, LinkedIn), Intelligent "
+            "Cloud (Azure), and More Personal Computing (Windows, Xbox, Surface)."
+        ),
+    },
+    {
+        "name": "Alphabet Inc.", "ticker": "GOOGL", "company_type": "public",
+        "sector": "Technology", "industry": "Internet Services & Infrastructure",
+        "founded_year": 1998, "headquarters": "Mountain View, CA",
+        "website": "https://abc.xyz", "employee_count": "181,000+",
+        "description": (
+            "Parent company of Google. Operates through Google Services (Search, YouTube, "
+            "Maps, Gmail, Android, Chrome), Google Cloud, and Other Bets including Waymo "
+            "(autonomous vehicles) and DeepMind (AI research)."
+        ),
+    },
+    {
+        "name": "Amazon.com Inc.", "ticker": "AMZN", "company_type": "public",
+        "sector": "Consumer Discretionary", "industry": "E-Commerce & Cloud Computing",
+        "founded_year": 1994, "headquarters": "Seattle, WA",
+        "website": "https://www.amazon.com", "employee_count": "1,500,000+",
+        "description": (
+            "Operates through three segments: North America and International (online retail, "
+            "Prime, Alexa devices) and Amazon Web Services (AWS), the leading cloud computing "
+            "platform providing infrastructure, databases, analytics, and AI services."
+        ),
+    },
+    {
+        "name": "Meta Platforms Inc.", "ticker": "META", "company_type": "public",
+        "sector": "Technology", "industry": "Social Media & Advertising",
+        "founded_year": 2004, "headquarters": "Menlo Park, CA",
+        "website": "https://www.meta.com", "employee_count": "67,000+",
+        "description": (
+            "Builds technology to connect people. Products include Facebook, Instagram, "
+            "WhatsApp, and Messenger. Also developing augmented and virtual reality hardware "
+            "and software through Reality Labs (Quest headsets, Ray-Ban Meta glasses)."
+        ),
+    },
+    {
+        "name": "NVIDIA Corporation", "ticker": "NVDA", "company_type": "public",
+        "sector": "Technology", "industry": "Semiconductors & AI Infrastructure",
+        "founded_year": 1993, "headquarters": "Santa Clara, CA",
+        "website": "https://www.nvidia.com", "employee_count": "36,000+",
+        "description": (
+            "Designs graphics processing units (GPUs) and system-on-chip units. Segments "
+            "include Graphics (GeForce, Quadro) and Compute & Networking (data center AI "
+            "accelerators, CUDA platform, Mellanox networking). Dominant in AI training "
+            "and inference infrastructure."
+        ),
+    },
+    {
+        "name": "Tesla Inc.", "ticker": "TSLA", "company_type": "public",
+        "sector": "Consumer Discretionary", "industry": "Electric Vehicles & Energy",
+        "founded_year": 2003, "headquarters": "Austin, TX",
+        "website": "https://www.tesla.com", "employee_count": "125,000+",
+        "description": (
+            "Designs, develops, manufactures, and sells battery electric vehicles, solar "
+            "energy generation systems, and energy storage products. Also develops full "
+            "self-driving technology and operates the Supercharger network globally."
+        ),
+    },
+]
+
+
+def seed_companies() -> None:
+    """Insert Mag 7 companies if not already present. Marks them as verified."""
+    with get_conn() as conn:
+        for c in _MAG7:
+            existing = conn.execute(
+                "SELECT id FROM companies WHERE name=?", (c["name"],)
+            ).fetchone()
+            if not existing:
+                conn.execute(
+                    "INSERT INTO companies "
+                    "(name, ticker, company_type, description, sector, industry, "
+                    "founded_year, headquarters, website, employee_count, "
+                    "is_verified, verified_at, verified_by) "
+                    "VALUES (?,?,?,?,?,?,?,?,?,?,1,datetime('now'),'system')",
+                    (c["name"], c["ticker"], c["company_type"], c["description"],
+                     c["sector"], c["industry"], c["founded_year"],
+                     c["headquarters"], c["website"], c["employee_count"]),
+                )
 
 
 def migrate_from_json() -> None:

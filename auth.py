@@ -47,7 +47,7 @@ def get_current_user(token: str = Depends(_oauth2_scheme)) -> dict:
         raise HTTPException(status_code=401, detail="Invalid or expired token.")
     with get_conn() as conn:
         row = conn.execute(
-            "SELECT id, username, email FROM users WHERE id=?", (user_id,)
+            "SELECT id, username, email, is_admin FROM users WHERE id=?", (user_id,)
         ).fetchone()
     if not row:
         raise HTTPException(status_code=401, detail="User not found.")

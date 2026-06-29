@@ -187,6 +187,45 @@
   .auth-toggle a { color: var(--accent); cursor: pointer; text-decoration: none; font-weight: 500; }
   .auth-toggle a:hover { text-decoration: underline; }
 
+  /* COMPANY PROFILES */
+  .company-section { margin-top: 28px; }
+  .company-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; margin-top: 16px; }
+  .company-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+                  padding: 20px; cursor: pointer; transition: border-color .15s, box-shadow .15s;
+                  display: flex; flex-direction: column; gap: 12px; }
+  .company-card:hover { border-color: var(--accent); box-shadow: 0 4px 14px rgba(0,0,0,.08); }
+  .company-card-header { display: flex; align-items: flex-start; gap: 14px; }
+  .company-avatar { width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center;
+                    justify-content: center; font-weight: 700; font-size: 17px; color: #fff; flex-shrink: 0; }
+  .company-name-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .company-name { font-weight: 700; font-size: 15px; line-height: 1.3; }
+  .company-ticker { font-family: 'SF Mono','Fira Code',monospace; font-size: 11px; font-weight: 600;
+                    color: var(--muted); background: var(--bg); border: 1px solid var(--border);
+                    padding: 1px 6px; border-radius: 4px; }
+  .verified-badge { display: inline-flex; align-items: center; justify-content: center;
+                    width: 17px; height: 17px; background: var(--accent); border-radius: 50%;
+                    color: #fff; font-size: 9px; font-weight: 800; flex-shrink: 0; }
+  .company-meta { font-size: 12px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 8px; }
+  .company-desc { font-size: 13px; color: var(--text); line-height: 1.55;
+                  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .company-type-badge { font-size: 11px; font-weight: 600; padding: 2px 7px; border-radius: 9999px; }
+  .type-public   { background: var(--blue-bg); color: var(--blue); }
+  .type-private  { background: var(--amber-bg); color: var(--amber); }
+  .type-startup  { background: #ede9fe; color: #6d28d9; }
+  .company-search { width: 100%; max-width: 320px; }
+
+  /* COMPANY DETAIL MODAL */
+  .company-detail-header { display: flex; gap: 18px; align-items: flex-start; margin-bottom: 20px; }
+  .company-detail-avatar { width: 64px; height: 64px; border-radius: 14px; flex-shrink: 0;
+                           display: flex; align-items: center; justify-content: center;
+                           font-size: 24px; font-weight: 700; color: #fff; }
+  .company-detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 20px; margin-bottom: 20px; }
+  .detail-field label { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: .5px;
+                        color: var(--muted); font-weight: 600; margin-bottom: 3px; }
+  .detail-field span { font-size: 13px; color: var(--text); word-break: break-word; }
+  .detail-field a { font-size: 13px; color: var(--accent); text-decoration: none; }
+  .detail-field a:hover { text-decoration: underline; }
+
   /* MOBILE */
   @media (max-width: 640px) {
     nav { height: auto; flex-wrap: wrap; padding: 10px 16px; gap: 8px; }
@@ -292,6 +331,23 @@
       <div class="section-title">Watchlist</div>
     </div>
     <div id="watchlist-body"><div class="no-data">Loading...</div></div>
+  </div>
+
+  <!-- Company Profiles -->
+  <div class="company-section">
+    <div class="section-header" style="gap:12px;flex-wrap:wrap">
+      <div class="section-title">Company Profiles</div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <input class="company-search" id="company-search" placeholder="Search companies..." oninput="filterCompanies()" />
+        <button class="btn btn-primary" onclick="openAddCompanyModal()">+ Company</button>
+      </div>
+    </div>
+    <div class="company-grid" id="company-grid">
+      <div style="padding:32px;text-align:center;color:var(--muted);grid-column:1/-1">
+        <div class="spinner"></div>
+        <div style="margin-top:10px">Loading company profiles...</div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -503,6 +559,111 @@
   </div>
 </div>
 
+<!-- Company Detail Modal -->
+<div class="overlay" id="company-detail-modal">
+  <div class="modal" style="width:540px">
+    <div class="company-detail-header">
+      <div class="company-detail-avatar" id="cd-avatar"></div>
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px">
+          <span class="company-name" id="cd-name" style="font-size:18px"></span>
+          <span id="cd-ticker-badge"></span>
+          <span id="cd-verified-badge"></span>
+          <span id="cd-type-badge"></span>
+        </div>
+        <div id="cd-verified-by" style="font-size:11px;color:var(--muted)"></div>
+      </div>
+    </div>
+    <div class="company-detail-grid" id="cd-grid"></div>
+    <div style="margin-bottom:20px" id="cd-desc-wrap">
+      <label style="display:block;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;margin-bottom:6px">About</label>
+      <p id="cd-desc" style="font-size:13px;line-height:1.6;color:var(--text)"></p>
+    </div>
+    <div class="modal-footer" id="cd-footer">
+      <button class="btn btn-ghost" onclick="closeModal('company-detail-modal')">Close</button>
+      <button class="btn btn-ghost" id="cd-edit-btn" onclick="openEditCompanyModal()" style="display:none">Edit</button>
+      <button class="btn btn-danger btn-sm" id="cd-delete-btn" onclick="deleteCompany()" style="display:none">Delete</button>
+      <button class="btn btn-primary" id="cd-verify-btn" onclick="verifyCompany()" style="display:none">Verify</button>
+      <button class="btn btn-ghost" id="cd-unverify-btn" onclick="unverifyCompany()" style="display:none">Remove Verification</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add / Edit Company Modal -->
+<div class="overlay" id="company-modal">
+  <div class="modal" style="width:520px">
+    <div class="modal-title" id="company-modal-title">Add Company Profile</div>
+    <div class="modal-subtitle">Public companies, private unicorns, or early-stage startups.</div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 16px">
+      <div class="form-group" style="grid-column:1/-1">
+        <label>Company Name <span style="color:var(--red)">*</span></label>
+        <input id="co-name" placeholder='e.g. "Stripe" or "Apple Inc."' />
+      </div>
+      <div class="form-group">
+        <label>Ticker Symbol (public companies)</label>
+        <input id="co-ticker" placeholder="AAPL" style="text-transform:uppercase" />
+      </div>
+      <div class="form-group">
+        <label>Company Type</label>
+        <select id="co-type" onchange="updateStageVisibility()">
+          <option value="public">Public</option>
+          <option value="private">Private</option>
+          <option value="startup">Startup</option>
+        </select>
+      </div>
+      <div class="form-group" id="co-stage-group" style="display:none">
+        <label>Stage</label>
+        <select id="co-stage">
+          <option value="">— Select —</option>
+          <option value="Pre-Seed">Pre-Seed</option>
+          <option value="Seed">Seed</option>
+          <option value="Series A">Series A</option>
+          <option value="Series B">Series B</option>
+          <option value="Series C">Series C</option>
+          <option value="Series D+">Series D+</option>
+          <option value="Pre-IPO">Pre-IPO</option>
+          <option value="Other">Other</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Sector</label>
+        <input id="co-sector" placeholder="Technology" />
+      </div>
+      <div class="form-group">
+        <label>Industry</label>
+        <input id="co-industry" placeholder="Software & Cloud" />
+      </div>
+      <div class="form-group">
+        <label>Founded Year</label>
+        <input id="co-founded" type="number" min="1800" max="2099" placeholder="2010" />
+      </div>
+      <div class="form-group">
+        <label>Headquarters</label>
+        <input id="co-hq" placeholder="San Francisco, CA" />
+      </div>
+      <div class="form-group">
+        <label>Website</label>
+        <input id="co-website" placeholder="https://example.com" />
+      </div>
+      <div class="form-group">
+        <label>Employees</label>
+        <input id="co-employees" placeholder='e.g. "5,000+" or "50-200"' />
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Description</label>
+      <textarea id="co-desc" rows="4" placeholder="What does the company do? Business model, key products, competitive moat..."></textarea>
+    </div>
+
+    <div class="form-error" id="company-modal-error"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('company-modal')">Cancel</button>
+      <button class="btn btn-primary" id="company-modal-btn" onclick="submitCompany()">Add Company</button>
+    </div>
+  </div>
+</div>
+
 <!-- Add Watchlist Modal -->
 <div class="overlay" id="watchlist-modal">
   <div class="modal">
@@ -587,10 +748,10 @@
       if (!res.ok) { errEl.textContent = (await res.json()).detail || 'Login failed.'; return; }
       const data = await res.json();
       setToken(data.token);
-      document.getElementById('nav-username').textContent = data.username;
-      document.getElementById('logout-btn').style.display = '';
       hideAuthOverlay();
-      loadData();
+      // fetch full profile (includes is_admin)
+      const me = await authFetch('/api/auth/me').then(r => r.json());
+      onLoggedIn(me);
     } catch (e) { errEl.textContent = 'Network error. Please try again.'; }
   }
 
@@ -608,10 +769,9 @@
       if (!res.ok) { errEl.textContent = (await res.json()).detail || 'Signup failed.'; return; }
       const data = await res.json();
       setToken(data.token);
-      document.getElementById('nav-username').textContent = data.username;
-      document.getElementById('logout-btn').style.display = '';
       hideAuthOverlay();
-      loadData();
+      const me = await authFetch('/api/auth/me').then(r => r.json());
+      onLoggedIn(me);
     } catch (e) { errEl.textContent = 'Network error. Please try again.'; }
   }
 
@@ -809,7 +969,7 @@
           ${notesHtml}
           <div class="thesis-actions">
             <button class="btn btn-ghost btn-sm" onclick="openAddPosition('${esc(t.name)}')">+ Add Position</button>
-            <button class="btn btn-ghost btn-sm" onclick="openEditNotes('${esc(t.name)}',${JSON.stringify(t.notes||'')})">Edit Notes</button>
+            <button class="btn btn-ghost btn-sm" onclick="openEditNotes('${esc(t.name)}')">Edit Notes</button>
             <button class="btn btn-danger btn-sm" onclick="deleteThesis('${esc(t.name)}')">Delete Thesis</button>
           </div>
           ${openHtml}${privateHtml}${closedHtml}${closedPrivHtml}
@@ -1033,10 +1193,11 @@
   }
 
   // Edit thesis notes
-  function openEditNotes(thesisName, currentNotes) {
+  function openEditNotes(thesisName) {
     _editNotesTarget = thesisName;
+    const thesis = _theses.find(t => t.name === thesisName);
     document.getElementById('edit-notes-subtitle').textContent = `Thesis: "${thesisName}"`;
-    document.getElementById('edit-notes-input').value = currentNotes || '';
+    document.getElementById('edit-notes-input').value = (thesis && thesis.notes) || '';
     document.getElementById('edit-notes-error').textContent = '';
     openModal('edit-notes-modal');
     setTimeout(() => document.getElementById('edit-notes-input').focus(), 50);
@@ -1088,7 +1249,7 @@
     document.getElementById('pos-modal-error').textContent = '';
     setPositionType('private');
     openModal('position-modal');
-    setTimeout(() => document.getElementById('pos-ticker').focus(), 50);
+    setTimeout(() => document.getElementById('priv-company').focus(), 50);
   }
 
   function apiErrMsg(detail) {
@@ -1309,9 +1470,16 @@
 
   async function refreshFileList() {
     const { entityType, entityId } = _filesTarget;
-    const res = await authFetch(`/api/attachments/${entityType}/${entityId}`);
-    const files = await res.json();
     const listEl = document.getElementById('files-list');
+    listEl.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:8px 0">Loading...</div>';
+    let files;
+    try {
+      const res = await authFetch(`/api/attachments/${entityType}/${entityId}`);
+      if (!res.ok) { listEl.innerHTML = `<div style="color:var(--red);font-size:13px">Error loading files.</div>`; return; }
+      files = await res.json();
+    } catch (e) {
+      listEl.innerHTML = `<div style="color:var(--red);font-size:13px">${e.message || 'Network error.'}</div>`; return;
+    }
     if (!files.length) {
       listEl.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:8px 0">No files attached yet.</div>';
       return;
@@ -1375,6 +1543,246 @@
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
   }
 
+  // ---------------------------------------------------------------------------
+  // Company profiles
+  // ---------------------------------------------------------------------------
+
+  let _companies    = [];
+  let _currentUser  = null;
+  let _editingCompanyId = null;
+
+  // Avatar: deterministic color from company name
+  const _avatarColors = [
+    '#2563eb','#7c3aed','#db2777','#dc2626','#d97706',
+    '#16a34a','#0891b2','#4f46e5','#059669','#9333ea',
+  ];
+  function avatarColor(name) {
+    let h = 0;
+    for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) & 0xffffffff;
+    return _avatarColors[Math.abs(h) % _avatarColors.length];
+  }
+  function avatarInitials(name) {
+    const words = name.replace(/[^a-zA-Z0-9 ]/g, '').split(/\s+/).filter(Boolean);
+    if (words.length >= 2) return (words[0][0] + words[1][0]).toUpperCase();
+    return name.slice(0, 2).toUpperCase();
+  }
+
+  function typeBadgeHtml(type) {
+    const map = { public: ['type-public','Public'], private: ['type-private','Private'], startup: ['type-startup','Startup'] };
+    const [cls, label] = map[type] || ['badge-gray','Unknown'];
+    return `<span class="company-type-badge ${cls}">${label}</span>`;
+  }
+
+  function verifiedBadgeHtml() {
+    return `<span class="verified-badge" title="Verified company">&#10003;</span>`;
+  }
+
+  async function loadCompanies() {
+    try {
+      const res = await authFetch('/api/companies');
+      _companies = await res.json();
+      renderCompanies(_companies);
+    } catch(e) {
+      document.getElementById('company-grid').innerHTML =
+        `<div style="grid-column:1/-1;color:var(--red);padding:20px">${e.message || 'Failed to load companies.'}</div>`;
+    }
+  }
+
+  function filterCompanies() {
+    const q = document.getElementById('company-search').value.toLowerCase();
+    renderCompanies(q ? _companies.filter(c =>
+      c.name.toLowerCase().includes(q) ||
+      (c.ticker||'').toLowerCase().includes(q) ||
+      (c.sector||'').toLowerCase().includes(q) ||
+      (c.industry||'').toLowerCase().includes(q)
+    ) : _companies);
+  }
+
+  function renderCompanies(list) {
+    const grid = document.getElementById('company-grid');
+    if (!list.length) {
+      grid.innerHTML = `<div style="grid-column:1/-1;padding:32px;text-align:center;color:var(--muted)">No companies found.</div>`;
+      return;
+    }
+    grid.innerHTML = list.map(c => {
+      const color    = avatarColor(c.name);
+      const initials = avatarInitials(c.name);
+      const ticker   = c.ticker ? `<span class="company-ticker">${esc(c.ticker)}</span>` : '';
+      const verified = c.is_verified ? verifiedBadgeHtml() : '';
+      const meta = [c.sector, c.headquarters, c.founded_year ? `Est. ${c.founded_year}` : '']
+        .filter(Boolean).join(' · ');
+      return `
+        <div class="company-card" onclick="openCompanyDetail(${c.id})">
+          <div class="company-card-header">
+            <div class="company-avatar" style="background:${color}">${initials}</div>
+            <div style="flex:1;min-width:0">
+              <div class="company-name-row">
+                <span class="company-name">${esc(c.name)}</span>
+                ${ticker}${verified}
+              </div>
+              <div style="display:flex;gap:6px;align-items:center;margin-top:4px;flex-wrap:wrap">
+                ${typeBadgeHtml(c.company_type)}
+                ${c.stage ? `<span style="font-size:11px;color:var(--muted)">${esc(c.stage)}</span>` : ''}
+              </div>
+            </div>
+          </div>
+          ${meta ? `<div class="company-meta">${esc(meta)}</div>` : ''}
+          ${c.description ? `<div class="company-desc">${esc(c.description)}</div>` : ''}
+        </div>`;
+    }).join('');
+  }
+
+  function openCompanyDetail(id) {
+    const c = _companies.find(x => x.id === id);
+    if (!c) return;
+    _editingCompanyId = id;
+
+    const color    = avatarColor(c.name);
+    const initials = avatarInitials(c.name);
+    document.getElementById('cd-avatar').style.background = color;
+    document.getElementById('cd-avatar').textContent = initials;
+    document.getElementById('cd-name').textContent = c.name;
+    document.getElementById('cd-ticker-badge').innerHTML = c.ticker
+      ? `<span class="company-ticker">${esc(c.ticker)}</span>` : '';
+    document.getElementById('cd-verified-badge').innerHTML = c.is_verified ? verifiedBadgeHtml() : '';
+    document.getElementById('cd-type-badge').innerHTML = typeBadgeHtml(c.company_type);
+    document.getElementById('cd-verified-by').textContent = c.is_verified
+      ? `Verified by ${esc(c.verified_by||'system')}${c.verified_at ? ' on ' + c.verified_at.slice(0,10) : ''}`
+      : '';
+
+    const fields = [
+      ['Sector', c.sector], ['Industry', c.industry],
+      ['Stage', c.stage], ['Founded', c.founded_year],
+      ['Headquarters', c.headquarters], ['Employees', c.employee_count],
+      ['Website', c.website, true],
+    ].filter(([, v]) => v);
+
+    document.getElementById('cd-grid').innerHTML = fields.map(([label, val, isLink]) => `
+      <div class="detail-field">
+        <label>${label}</label>
+        ${isLink
+          ? `<a href="${esc(val)}" target="_blank" rel="noopener">${esc(val)}</a>`
+          : `<span>${esc(String(val))}</span>`}
+      </div>`).join('');
+
+    document.getElementById('cd-desc').textContent = c.description || '';
+    document.getElementById('cd-desc-wrap').style.display = c.description ? '' : 'none';
+
+    // Show/hide action buttons based on role
+    const isAdmin = _currentUser && _currentUser.is_admin;
+    const isOwner = _currentUser && c.created_by === _currentUser.id;
+    document.getElementById('cd-edit-btn').style.display    = (isAdmin || isOwner) ? '' : 'none';
+    document.getElementById('cd-delete-btn').style.display  = (isAdmin || isOwner) ? '' : 'none';
+    document.getElementById('cd-verify-btn').style.display  = (isAdmin && !c.is_verified) ? '' : 'none';
+    document.getElementById('cd-unverify-btn').style.display = (isAdmin && c.is_verified) ? '' : 'none';
+
+    openModal('company-detail-modal');
+  }
+
+  function openAddCompanyModal() {
+    _editingCompanyId = null;
+    document.getElementById('company-modal-title').textContent = 'Add Company Profile';
+    document.getElementById('company-modal-btn').textContent  = 'Add Company';
+    document.getElementById('company-modal-error').textContent = '';
+    ['co-name','co-ticker','co-sector','co-industry','co-hq','co-website','co-employees','co-desc'].forEach(id => {
+      document.getElementById(id).value = '';
+    });
+    document.getElementById('co-type').value  = 'public';
+    document.getElementById('co-stage').value = '';
+    updateStageVisibility();
+    openModal('company-modal');
+    setTimeout(() => document.getElementById('co-name').focus(), 50);
+  }
+
+  function openEditCompanyModal() {
+    const c = _companies.find(x => x.id === _editingCompanyId);
+    if (!c) return;
+    closeModal('company-detail-modal');
+    document.getElementById('company-modal-title').textContent = 'Edit Company Profile';
+    document.getElementById('company-modal-btn').textContent  = 'Save Changes';
+    document.getElementById('company-modal-error').textContent = '';
+    document.getElementById('co-name').value      = c.name;
+    document.getElementById('co-ticker').value    = c.ticker || '';
+    document.getElementById('co-type').value      = c.company_type || 'public';
+    document.getElementById('co-stage').value     = c.stage || '';
+    document.getElementById('co-sector').value    = c.sector || '';
+    document.getElementById('co-industry').value  = c.industry || '';
+    document.getElementById('co-founded').value   = c.founded_year || '';
+    document.getElementById('co-hq').value        = c.headquarters || '';
+    document.getElementById('co-website').value   = c.website || '';
+    document.getElementById('co-employees').value = c.employee_count || '';
+    document.getElementById('co-desc').value      = c.description || '';
+    updateStageVisibility();
+    openModal('company-modal');
+  }
+
+  function updateStageVisibility() {
+    const type = document.getElementById('co-type').value;
+    document.getElementById('co-stage-group').style.display =
+      (type === 'startup' || type === 'private') ? '' : 'none';
+  }
+
+  async function submitCompany() {
+    const btn   = document.getElementById('company-modal-btn');
+    const errEl = document.getElementById('company-modal-error');
+    errEl.textContent = '';
+    const name = document.getElementById('co-name').value.trim();
+    if (!name) { errEl.textContent = 'Company name is required.'; return; }
+
+    const body = {
+      name,
+      ticker:        document.getElementById('co-ticker').value.trim() || null,
+      company_type:  document.getElementById('co-type').value,
+      stage:         document.getElementById('co-stage').value,
+      sector:        document.getElementById('co-sector').value.trim(),
+      industry:      document.getElementById('co-industry').value.trim(),
+      founded_year:  parseInt(document.getElementById('co-founded').value) || null,
+      headquarters:  document.getElementById('co-hq').value.trim(),
+      website:       document.getElementById('co-website').value.trim(),
+      employee_count: document.getElementById('co-employees').value.trim(),
+      description:   document.getElementById('co-desc').value.trim(),
+    };
+
+    btn.disabled = true; btn.textContent = 'Saving...';
+    try {
+      const url    = _editingCompanyId ? `/api/companies/${_editingCompanyId}` : '/api/companies';
+      const method = _editingCompanyId ? 'PATCH' : 'POST';
+      const res    = await authFetch(url, { method, body: JSON.stringify(body) });
+      if (!res.ok) { errEl.textContent = apiErrMsg((await res.json()).detail); return; }
+      closeModal('company-modal');
+      await loadCompanies();
+    } catch(e) {
+      errEl.textContent = e.message || 'Network error.';
+    } finally {
+      btn.disabled = false;
+      btn.textContent = _editingCompanyId ? 'Save Changes' : 'Add Company';
+    }
+  }
+
+  async function verifyCompany() {
+    const res = await authFetch(`/api/companies/${_editingCompanyId}/verify`, { method: 'POST' });
+    if (!res.ok) { alert((await res.json()).detail || 'Error.'); return; }
+    closeModal('company-detail-modal');
+    await loadCompanies();
+  }
+
+  async function unverifyCompany() {
+    if (!confirm('Remove verification from this company?')) return;
+    const res = await authFetch(`/api/companies/${_editingCompanyId}/unverify`, { method: 'POST' });
+    if (!res.ok) { alert((await res.json()).detail || 'Error.'); return; }
+    closeModal('company-detail-modal');
+    await loadCompanies();
+  }
+
+  async function deleteCompany() {
+    const c = _companies.find(x => x.id === _editingCompanyId);
+    if (!confirm(`Delete company profile for "${c ? c.name : 'this company'}"?`)) return;
+    const res = await authFetch(`/api/companies/${_editingCompanyId}`, { method: 'DELETE' });
+    if (!res.ok) { alert((await res.json()).detail || 'Error.'); return; }
+    closeModal('company-detail-modal');
+    await loadCompanies();
+  }
+
   // Enter key shortcuts
   document.getElementById('auth-password').addEventListener('keydown',     e => { if(e.key==='Enter') submitLogin(); });
   document.getElementById('signup-password').addEventListener('keydown',   e => { if(e.key==='Enter') submitSignup(); });
@@ -1395,15 +1803,20 @@
   // Boot
   // ---------------------------------------------------------------------------
 
+  function onLoggedIn(data) {
+    _currentUser = data;
+    document.getElementById('nav-username').textContent = data.username;
+    document.getElementById('logout-btn').style.display = '';
+    loadData();
+    loadCompanies();
+  }
+
   if (getToken()) {
-    // Verify token is still valid then load
     authFetch('/api/auth/me').then(r => {
       if (r.ok) return r.json();
       throw new Error('invalid');
     }).then(data => {
-      document.getElementById('nav-username').textContent = data.username;
-      document.getElementById('logout-btn').style.display = '';
-      loadData();
+      onLoggedIn(data);
     }).catch(() => {
       clearToken();
       showAuthOverlay();
