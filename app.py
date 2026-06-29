@@ -349,6 +349,23 @@ async def upload_attachment(
     return {"ok": True}
 
 
+@app.get("/api/attachments/{attachment_id}/download")
+def download_attachment(attachment_id: int, current_user: dict = Depends(get_current_user)):
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT filename, mime_type, data FROM attachments WHERE id=? AND user_id=?",
+            (attachment_id, current_user["id"]),
+        ).fetchone()
+    if not row:
+        raise HTTPException(404, "Attachment not found.")
+    safe_name = row["filename"].replace('"', '_')
+    return Response(
+        content=bytes(row["data"]),
+        media_type=row["mime_type"],
+        headers={"Content-Disposition": f'attachment; filename="{safe_name}"'},
+    )
+
+
 @app.get("/api/attachments/{entity_type}/{entity_id}")
 def list_attachments(entity_type: str, entity_id: int,
                      current_user: dict = Depends(get_current_user)):
@@ -359,22 +376,6 @@ def list_attachments(entity_type: str, entity_id: int,
             (current_user["id"], entity_type, entity_id),
         ).fetchall()
     return [dict(r) for r in rows]
-
-
-@app.get("/api/attachments/{attachment_id}/download")
-def download_attachment(attachment_id: int, current_user: dict = Depends(get_current_user)):
-    with get_conn() as conn:
-        row = conn.execute(
-            "SELECT filename, mime_type, data FROM attachments WHERE id=? AND user_id=?",
-            (attachment_id, current_user["id"]),
-        ).fetchone()
-    if not row:
-        raise HTTPException(404, "Attachment not found.")
-    return Response(
-        content=bytes(row["data"]),
-        media_type=row["mime_type"],
-        headers={"Content-Disposition": f'attachment; filename="{row["filename"]}"'},
-    )
 
 
 @app.delete("/api/attachments/{attachment_id}")

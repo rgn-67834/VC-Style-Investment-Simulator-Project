@@ -122,6 +122,30 @@
   .badge-gray   { background: var(--border);    color: var(--muted); }
   .badge-moic   { background: #ede9fe; color: #6d28d9; }
 
+  /* PRIVATE POSITION CARDS */
+  .priv-card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; margin-top: 12px; }
+  .priv-card { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius);
+               overflow: hidden; transition: border-color .15s, box-shadow .15s; }
+  .priv-card:hover { border-color: var(--accent); box-shadow: 0 3px 12px rgba(0,0,0,.07); }
+  .priv-card-header { display: flex; align-items: center; gap: 12px; padding: 14px 16px; cursor: pointer; user-select: none; }
+  .priv-card-avatar { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center;
+                      justify-content: center; font-weight: 700; font-size: 15px; color: #fff; flex-shrink: 0; }
+  .priv-card-title { font-weight: 600; font-size: 14px; line-height: 1.3; }
+  .priv-card-sub   { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .priv-card-kpis  { display: flex; gap: 6px; align-items: center; margin-left: auto; flex-shrink: 0; }
+  .priv-card-chevron { font-size: 10px; color: var(--muted); margin-left: 6px; transition: transform .2s; }
+  .priv-card.open .priv-card-chevron { transform: rotate(180deg); }
+  .priv-card-details { display: none; border-top: 1px solid var(--border); padding: 14px 16px; }
+  .priv-card.open .priv-card-details { display: block; }
+  .priv-detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 16px; margin-bottom: 10px; }
+  .priv-detail-item label { display: block; font-size: 10px; color: var(--muted); text-transform: uppercase;
+                             letter-spacing: .04em; margin-bottom: 2px; }
+  .priv-detail-item span  { font-size: 13px; font-weight: 500; }
+  .priv-card-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; padding-top: 10px;
+                       border-top: 1px solid var(--border); }
+  .priv-card-notes { font-size: 12px; color: var(--muted); margin-bottom: 10px; line-height: 1.5;
+                     padding: 8px 10px; background: var(--surface); border-radius: 6px; }
+
   /* OPPORTUNITY INDICATOR */
   .opp-positive { color: var(--red); font-weight: 600; }
   .opp-negative { color: var(--green); font-weight: 600; }
@@ -541,6 +565,24 @@
   </div>
 </div>
 
+<!-- File Preview Modal -->
+<div class="overlay" id="preview-modal">
+  <div class="modal" style="width:760px;max-width:96vw">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;gap:12px">
+      <div style="min-width:0">
+        <div class="modal-title" id="preview-title" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></div>
+        <div id="preview-meta" style="font-size:12px;color:var(--muted);margin-top:3px"></div>
+      </div>
+      <button class="btn btn-ghost btn-sm" style="flex-shrink:0" onclick="closePreview()">&#x2715;</button>
+    </div>
+    <div id="preview-content" style="min-height:120px"></div>
+    <div class="modal-footer" style="margin-top:16px">
+      <button class="btn btn-ghost" onclick="closePreview()">Close</button>
+      <button class="btn btn-primary" id="preview-download-btn">Download</button>
+    </div>
+  </div>
+</div>
+
 <!-- Files / Attachments Modal -->
 <div class="overlay" id="files-modal">
   <div class="modal">
@@ -893,21 +935,11 @@
     // Open private positions
     let privateHtml = '';
     if (privCount) {
-      const rows = t.private_positions.map(p => privateRowHTML(t.name, p)).join('');
+      const cards = t.private_positions.map(p => privateRowHTML(t.name, p)).join('');
       privateHtml = `
         <hr class="closed-divider">
         <div class="sub-section"><div class="sub-section-title">Private / Startup Positions</div></div>
-        <div class="table-wrap"><table>
-          <thead><tr>
-            <th>Company</th><th class="num">Invested</th><th class="num">Entry Val</th>
-            <th class="num">Current Val</th><th class="num">Impl. Own%</th>
-            <th class="num">Curr Value</th><th class="num">Gain</th>
-            <th class="num">MOIC</th><th class="num">Proj. IRR</th>
-            <th class="num">Expected Exit</th><th class="num">Time Left</th>
-            <th class="num">Cap Gains</th><th class="num">Days</th><th></th>
-          </tr></thead>
-          <tbody>${rows}</tbody>
-        </table></div>`;
+        <div class="priv-card-grid">${cards}</div>`;
     }
 
     // Closed public positions
@@ -1030,62 +1062,76 @@
   }
 
   function privateRowHTML(thesisName, p) {
-    const s = p.gain >= 0 ? '+' : '';
+    const gainPos  = p.gain >= 0;
+    const s        = gainPos ? '+' : '';
+    const gainCls  = gainPos ? 'badge-green' : 'badge-red';
     const termBadge = p.term === 'long-term'
       ? '<span class="badge badge-blue">LT 15%</span>'
       : '<span class="badge badge-amber">ST 24%</span>';
     const moicBadge = `<span class="badge badge-moic">${Number(p.moic).toFixed(2)}x</span>`;
-    const notesTip  = p.notes ? ` title="${esc(p.notes)}"` : '';
+    const gainBadge = `<span class="badge ${gainCls}">${s}${fmtPct(p.gain_pct)}</span>`;
 
-    // Projected IRR
-    let irrHtml = '<span style="color:var(--muted);font-size:12px">—</span>';
+    // IRR badge
+    let irrHtml = '<span style="color:var(--muted)">—</span>';
     if (p.projected_irr != null) {
-      const irrPct  = p.projected_irr * 100;
-      const irrCls  = irrPct >= 0 ? 'badge-green' : 'badge-red';
-      const irrSign = irrPct >= 0 ? '+' : '';
-      irrHtml = `<span class="badge ${irrCls}">${irrSign}${irrPct.toFixed(1)}%</span>`;
+      const irrPct = p.projected_irr * 100;
+      const irrCls = irrPct >= 0 ? 'badge-green' : 'badge-red';
+      irrHtml = `<span class="badge ${irrCls}">${irrPct >= 0 ? '+' : ''}${irrPct.toFixed(1)}% IRR</span>`;
     }
 
-    // Expected exit
-    const exitType = p.liquidity_event_type || '';
+    // Exit / time remaining
     const exitDate = p.expected_liquidity_date || '';
-    let exitHtml = '<span style="color:var(--muted);font-size:12px">—</span>';
+    const exitType = p.liquidity_event_type || '';
+    let exitHtml = '<span style="color:var(--muted)">—</span>';
     if (exitDate) {
-      exitHtml = `<span style="font-size:12px">${exitDate}${exitType ? `<br><span style="color:var(--muted)">${esc(exitType)}</span>` : ''}</span>`;
-    }
-
-    // Time remaining
-    let timeHtml = '<span style="color:var(--muted);font-size:12px">—</span>';
-    if (p.time_to_liquidity) {
       const isPast = p.time_to_liquidity === 'Past due';
-      timeHtml = `<span class="badge ${isPast ? 'badge-red' : 'badge-blue'}">${p.time_to_liquidity}</span>`;
+      const timeBadge = p.time_to_liquidity
+        ? `<span class="badge ${isPast ? 'badge-red' : 'badge-blue'}">${p.time_to_liquidity}</span>` : '';
+      exitHtml = `${exitDate}${exitType ? ` · ${esc(exitType)}` : ''} ${timeBadge}`;
     }
 
-    return `<tr>
-      <td class="ticker-cell"${notesTip}>${esc(p.company)}</td>
-      <td class="num">${fmt(p.investment)}</td>
-      <td class="num" style="font-size:12px">${fmtB(p.entry_valuation)}</td>
-      <td class="num" style="font-size:12px">${fmtB(p.current_valuation)}</td>
-      <td class="num">${Number(p.implied_ownership_pct).toFixed(4)}%</td>
-      <td class="num">${fmt(p.current_value)}</td>
-      <td class="num ${cc(p.gain)}">${s}${fmt(Math.abs(p.gain))}</td>
-      <td class="num">${moicBadge}</td>
-      <td class="num">${irrHtml}</td>
-      <td class="num">${exitHtml}</td>
-      <td class="num">${timeHtml}</td>
-      <td class="num">${termBadge}</td>
-      <td class="num">${p.days_held}d</td>
-      <td style="white-space:nowrap">
-        <button class="btn btn-ghost btn-sm" style="margin-right:4px"
-          onclick="openFiles('private_position',${p.id},'${esc(p.company)} files')">Files</button>
-        <button class="btn btn-ghost btn-sm" style="margin-right:4px"
-          onclick="openUpdatePrivate('${esc(thesisName)}','${esc(p.company)}',${p.current_valuation})">Edit</button>
-        <button class="btn btn-warning btn-sm" style="margin-right:4px"
-          onclick="openClosePrivate('${esc(thesisName)}','${esc(p.company)}')">Exit</button>
-        <button class="btn btn-danger btn-sm"
-          onclick="deletePrivate('${esc(thesisName)}','${esc(p.company)}')">Remove</button>
-      </td>
-    </tr>`;
+    const cardId = `priv-${p.id}`;
+    const color  = avatarColor(p.company);
+    const initials = avatarInitials(p.company);
+
+    return `
+      <div class="priv-card" id="${cardId}">
+        <div class="priv-card-header" onclick="document.getElementById('${cardId}').classList.toggle('open')">
+          <div class="priv-card-avatar" style="background:${color}">${initials}</div>
+          <div style="min-width:0">
+            <div class="priv-card-title">${esc(p.company)}</div>
+            <div class="priv-card-sub">${fmt(p.current_value)} current value</div>
+          </div>
+          <div class="priv-card-kpis">
+            ${moicBadge}${gainBadge}
+          </div>
+          <span class="priv-card-chevron">&#9660;</span>
+        </div>
+        <div class="priv-card-details">
+          ${p.notes ? `<div class="priv-card-notes">${esc(p.notes)}</div>` : ''}
+          <div class="priv-detail-grid">
+            <div class="priv-detail-item"><label>Invested</label><span>${fmt(p.investment)}</span></div>
+            <div class="priv-detail-item"><label>Gain / Loss</label><span class="${cc(p.gain)}">${s}${fmt(Math.abs(p.gain))}</span></div>
+            <div class="priv-detail-item"><label>Entry Valuation</label><span>${fmtB(p.entry_valuation)}</span></div>
+            <div class="priv-detail-item"><label>Current Valuation</label><span>${fmtB(p.current_valuation)}</span></div>
+            <div class="priv-detail-item"><label>Impl. Ownership</label><span>${Number(p.implied_ownership_pct).toFixed(4)}%</span></div>
+            <div class="priv-detail-item"><label>Days Held</label><span>${p.days_held}d</span></div>
+            <div class="priv-detail-item"><label>Proj. IRR</label><span>${irrHtml}</span></div>
+            <div class="priv-detail-item"><label>Cap Gains</label><span>${termBadge}</span></div>
+            <div class="priv-detail-item" style="grid-column:1/-1"><label>Expected Exit</label><span>${exitHtml}</span></div>
+          </div>
+          <div class="priv-card-actions">
+            <button class="btn btn-ghost btn-sm"
+              onclick="openFiles('private_position',${p.id},${JSON.stringify(p.company + ' files')})">Files</button>
+            <button class="btn btn-ghost btn-sm"
+              onclick="openUpdatePrivate(${JSON.stringify(thesisName)},${JSON.stringify(p.company)},${p.current_valuation})">Edit</button>
+            <button class="btn btn-warning btn-sm"
+              onclick="openClosePrivate(${JSON.stringify(thesisName)},${JSON.stringify(p.company)})">Exit</button>
+            <button class="btn btn-danger btn-sm"
+              onclick="deletePrivate(${JSON.stringify(thesisName)},${JSON.stringify(p.company)})">Remove</button>
+          </div>
+        </div>
+      </div>`;
   }
 
   function closedPrivateRowHTML(p) {
@@ -1459,6 +1505,9 @@
     return (n / (1024 * 1024)).toFixed(1) + ' MB';
   }
 
+  // Stored so we can call downloadFile from the preview modal
+  let _previewObjectUrl = null;
+
   async function openFiles(entityType, entityId, label) {
     _filesTarget = { entityType, entityId, label };
     document.getElementById('files-modal-subtitle').textContent = label;
@@ -1485,13 +1534,16 @@
       return;
     }
     listEl.innerHTML = files.map(f => `
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
-        <div style="overflow:hidden">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--border)">
+        <div style="overflow:hidden;margin-right:10px">
           <div style="font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(f.filename)}</div>
           <div style="font-size:11px;color:var(--muted)">${fmtBytes(f.size_bytes)} &middot; ${f.uploaded_at.slice(0,10)}</div>
         </div>
-        <div style="display:flex;gap:6px;flex-shrink:0;margin-left:12px">
-          <button class="btn btn-ghost btn-sm" onclick="downloadFile(${f.id},'${esc(f.filename)}')">Download</button>
+        <div style="display:flex;gap:5px;flex-shrink:0">
+          <button class="btn btn-ghost btn-sm"
+            onclick="_previewFile(${f.id},${JSON.stringify(f.filename)},${JSON.stringify(f.mime_type)},${f.size_bytes})">Preview</button>
+          <button class="btn btn-ghost btn-sm"
+            onclick="downloadFile(${f.id},${JSON.stringify(f.filename)})">Download</button>
           <button class="btn btn-danger btn-sm" onclick="deleteFile(${f.id})">Remove</button>
         </div>
       </div>`).join('');
@@ -1506,14 +1558,19 @@
     const { entityType, entityId } = _filesTarget;
     const form = new FormData();
     form.append('entity_type', entityType);
-    form.append('entity_id', entityId);
+    form.append('entity_id', String(entityId));
     form.append('file', input.files[0]);
     btn.disabled = true; btn.textContent = 'Uploading...';
     try {
       const token = getToken();
       const headers = token ? { Authorization: 'Bearer ' + token } : {};
       const res = await fetch('/api/attachments', { method: 'POST', headers, body: form });
-      if (!res.ok) { errEl.textContent = (await res.json()).detail || 'Upload failed.'; return; }
+      if (!res.ok) {
+        let msg = 'Upload failed.';
+        try { msg = (await res.json()).detail || msg; } catch(_) {}
+        errEl.textContent = msg;
+        return;
+      }
       input.value = '';
       await refreshFileList();
     } catch (err) {
@@ -1529,18 +1586,95 @@
     await refreshFileList();
   }
 
-  // Download helper that resolves the filename from Content-Disposition
-  async function downloadFile(attachmentId, fallbackName) {
+  async function downloadFile(attachmentId, filename) {
+    try {
+      const token = getToken();
+      const res = await fetch(`/api/attachments/${attachmentId}/download`,
+        { headers: token ? { Authorization: 'Bearer ' + token } : {} });
+      if (!res.ok) { alert(`Download failed (${res.status}). Please try again.`); return; }
+      const blob = await res.blob();
+      const url  = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = filename;
+      document.body.appendChild(a); a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+    } catch (e) {
+      alert('Download error: ' + (e.message || 'Network error.'));
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // File preview
+  // ---------------------------------------------------------------------------
+
+  function closePreview() {
+    closeModal('preview-modal');
+    if (_previewObjectUrl) { URL.revokeObjectURL(_previewObjectUrl); _previewObjectUrl = null; }
+    document.getElementById('preview-content').innerHTML = '';
+  }
+
+  async function _previewFile(attachmentId, filename, mimeType, sizeBytes) {
+    document.getElementById('preview-title').textContent = filename;
+    document.getElementById('preview-meta').textContent  = `${mimeType} · ${fmtBytes(sizeBytes)}`;
+    document.getElementById('preview-content').innerHTML =
+      '<div style="text-align:center;padding:40px"><div class="spinner"></div><div style="margin-top:10px;color:var(--muted)">Loading preview…</div></div>';
+    document.getElementById('preview-download-btn').onclick = () => downloadFile(attachmentId, filename);
+
+    if (_previewObjectUrl) { URL.revokeObjectURL(_previewObjectUrl); _previewObjectUrl = null; }
+    openModal('preview-modal');
+
     const token = getToken();
-    const res = await fetch(`/api/attachments/${attachmentId}/download`,
-      { headers: token ? { Authorization: 'Bearer ' + token } : {} });
-    const cd = res.headers.get('Content-Disposition') || '';
-    const match = cd.match(/filename="?([^"]+)"?/);
-    const name = match ? match[1] : fallbackName;
+    let res;
+    try {
+      res = await fetch(`/api/attachments/${attachmentId}/download`,
+        { headers: token ? { Authorization: 'Bearer ' + token } : {} });
+      if (!res.ok) throw new Error(`Server returned ${res.status}`);
+    } catch (e) {
+      document.getElementById('preview-content').innerHTML =
+        `<div style="color:var(--red);padding:16px;text-align:center">${e.message}</div>`;
+      return;
+    }
+
     const blob = await res.blob();
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob); a.download = name;
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    _previewObjectUrl = URL.createObjectURL(blob);
+    const contentEl = document.getElementById('preview-content');
+    const type = mimeType.toLowerCase();
+
+    if (type.startsWith('image/')) {
+      contentEl.innerHTML = `
+        <div style="text-align:center;background:var(--bg);border-radius:8px;padding:16px">
+          <img src="${_previewObjectUrl}" style="max-width:100%;max-height:65vh;object-fit:contain;border-radius:4px" />
+        </div>`;
+
+    } else if (type === 'application/pdf') {
+      contentEl.innerHTML =
+        `<iframe src="${_previewObjectUrl}" style="width:100%;height:68vh;border:none;border-radius:6px;background:#525659"></iframe>`;
+
+    } else if (type.startsWith('text/') || type === 'application/json' || type === 'application/xml') {
+      const rawText = await blob.text();
+      const truncated = rawText.length > 80000;
+      contentEl.innerHTML =
+        `<pre style="max-height:62vh;overflow:auto;background:var(--bg);padding:16px;border-radius:6px;
+                      font-size:12px;line-height:1.55;white-space:pre-wrap;color:var(--text);margin:0">${
+          esc(rawText.slice(0, 80000))}</pre>${
+          truncated ? `<div style="font-size:11px;color:var(--muted);margin-top:8px;text-align:center">Showing first 80 000 characters — download for full file.</div>` : ''}`;
+      URL.revokeObjectURL(_previewObjectUrl); _previewObjectUrl = null;
+
+    } else {
+      // Unsupported — show info card
+      const ext = filename.includes('.') ? filename.split('.').pop().toUpperCase() : '?';
+      contentEl.innerHTML = `
+        <div style="text-align:center;padding:52px 24px;color:var(--muted)">
+          <div style="display:inline-flex;align-items:center;justify-content:center;
+                      width:64px;height:64px;background:var(--bg);border-radius:14px;
+                      font-size:22px;font-weight:700;color:var(--accent);margin-bottom:16px">${esc(ext)}</div>
+          <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:6px">${esc(filename)}</div>
+          <div style="font-size:13px">${fmtBytes(sizeBytes)}</div>
+          <div style="margin-top:14px;font-size:13px">No preview available — click Download to open.</div>
+        </div>`;
+      URL.revokeObjectURL(_previewObjectUrl); _previewObjectUrl = null;
+    }
   }
 
   // ---------------------------------------------------------------------------
