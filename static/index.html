@@ -131,8 +131,8 @@
   .type-toggle button { flex: 1; padding: 8px; font-size: 13px; font-weight: 500; cursor: pointer;
                         border: none; background: transparent; color: var(--muted); transition: all .15s; }
   .type-toggle button.active { background: var(--accent); color: #fff; }
-  .private-fields { display: none; }
-  .public-fields  { display: block; }
+  .private-fields { display: block; }
+  .public-fields  { display: none; }
 
   /* CLOSED POSITIONS DIVIDER */
   .closed-divider { border: none; border-top: 2px dashed var(--border); margin: 4px 16px; }
@@ -258,13 +258,13 @@
 </div>
 
 <nav>
-  <div class="nav-brand">Thesis Tracker</div>
+  <div class="nav-brand">VC Tracker</div>
   <div class="nav-right">
     <span id="last-updated"></span>
     <span class="nav-user" id="nav-username"></span>
-    <button class="btn btn-ghost" onclick="loadData(true)" id="refresh-btn">Refresh Prices</button>
-    <button class="btn btn-ghost" onclick="openWatchlistModal()">+ Watchlist</button>
-    <button class="btn btn-primary" onclick="openNewThesisModal()">+ New Thesis</button>
+    <button class="btn btn-ghost" onclick="loadData(true)" id="refresh-btn">Refresh</button>
+    <button class="btn btn-ghost" onclick="openWatchlistModal()">Watchlist</button>
+    <button class="btn btn-primary" onclick="openNewThesisModal()">+ Thesis</button>
     <button class="btn btn-ghost" onclick="logout()" id="logout-btn" style="display:none">Sign Out</button>
   </div>
 </nav>
@@ -337,8 +337,8 @@
   <div class="modal">
     <div class="modal-title">Add Position</div>
     <div class="type-toggle">
-      <button id="toggle-public" class="active" onclick="setPositionType('public')">Public / ETF</button>
-      <button id="toggle-private" onclick="setPositionType('private')">Private / Startup</button>
+      <button id="toggle-private" class="active" onclick="setPositionType('private')">Private / Startup</button>
+      <button id="toggle-public" onclick="setPositionType('public')">Public / ETF</button>
     </div>
     <div class="form-group">
       <label>Thesis</label>
@@ -364,6 +364,10 @@
         <label>Entry Date (optional)</label>
         <input id="pos-entry-date" type="date" />
         <div class="form-hint">Backdate to simulate a past investment. Defaults to today.</div>
+      </div>
+      <div class="form-group">
+        <label>Notes (optional)</label>
+        <textarea id="pos-notes" placeholder="Conviction rationale, price target, key risks..." rows="3"></textarea>
       </div>
     </div>
 
@@ -481,6 +485,24 @@
   </div>
 </div>
 
+<!-- Files / Attachments Modal -->
+<div class="overlay" id="files-modal">
+  <div class="modal">
+    <div class="modal-title">Files</div>
+    <div class="modal-subtitle" id="files-modal-subtitle"></div>
+    <div id="files-list" style="margin-bottom:16px"></div>
+    <div class="form-group">
+      <label>Upload File</label>
+      <input id="files-upload-input" type="file" style="padding:6px 8px" />
+    </div>
+    <div class="form-error" id="files-modal-error"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('files-modal')">Close</button>
+      <button class="btn btn-primary" id="files-upload-btn" onclick="uploadFile()">Upload</button>
+    </div>
+  </div>
+</div>
+
 <!-- Add Watchlist Modal -->
 <div class="overlay" id="watchlist-modal">
   <div class="modal">
@@ -503,7 +525,8 @@
   let _updatePrivTarget = { thesis: null, company: null };
   let _closePrivTarget  = { thesis: null, company: null };
   let _editNotesTarget  = null;
-  let _positionType = 'public';
+  let _positionType = 'private';
+  let _filesTarget = { entityType: null, entityId: null, label: null };
 
   const TOKEN_KEY = 'tt_jwt';
 
@@ -799,8 +822,10 @@
     const termBadge = p.term === 'long-term'
       ? '<span class="badge badge-blue">LT 15%</span>'
       : '<span class="badge badge-amber">ST 24%</span>';
+    const notesTip = p.notes ? ` title="${esc(p.notes)}"` : '';
+    const posId = p.id || 0;
     return `<tr>
-      <td class="ticker-cell">${esc(p.ticker)}</td>
+      <td class="ticker-cell"${notesTip}>${esc(p.ticker)}</td>
       <td class="num">${fmtN(p.shares)}</td>
       <td class="num">${fmt(p.entry_price)}</td>
       <td class="num">${fmt(p.current_price)}</td>
@@ -811,6 +836,8 @@
       <td class="num ${cc(p.gain)}">${s}${fmt(Math.abs(p.net_gain))}</td>
       <td class="num">${p.days_held}d</td>
       <td style="white-space:nowrap">
+        <button class="btn btn-ghost btn-sm" style="margin-right:4px"
+          onclick="openFiles('position',${posId},'${esc(p.ticker)} files')">Files</button>
         <button class="btn btn-warning btn-sm" style="margin-right:4px"
           onclick="openCloseModal('${esc(thesisName)}','${esc(p.ticker)}',${p.current_price})">Close</button>
         <button class="btn btn-danger btn-sm"
@@ -889,6 +916,8 @@
       <td class="num">${termBadge}</td>
       <td class="num">${p.days_held}d</td>
       <td style="white-space:nowrap">
+        <button class="btn btn-ghost btn-sm" style="margin-right:4px"
+          onclick="openFiles('private_position',${p.id},'${esc(p.company)} files')">Files</button>
         <button class="btn btn-ghost btn-sm" style="margin-right:4px"
           onclick="openUpdatePrivate('${esc(thesisName)}','${esc(p.company)}',${p.current_valuation})">Edit</button>
         <button class="btn btn-warning btn-sm" style="margin-right:4px"
@@ -1051,60 +1080,74 @@
     sel.innerHTML = _theses.map(t =>
       `<option value="${esc(t.name)}" ${t.name===thesisName?'selected':''}>${esc(t.name)}</option>`
     ).join('');
-    ['pos-ticker','pos-shares','pos-price','pos-entry-date','priv-company','priv-investment',
-     'priv-entry-val','priv-current-val','priv-entry-date','priv-liquidity-date',
-     'priv-liquidity-type','priv-notes'].forEach(id => {
+    ['pos-ticker','pos-shares','pos-price','pos-entry-date','pos-notes',
+     'priv-company','priv-investment','priv-entry-val','priv-current-val',
+     'priv-entry-date','priv-liquidity-date','priv-liquidity-type','priv-notes'].forEach(id => {
       const el = document.getElementById(id); if (el) el.value = '';
     });
     document.getElementById('pos-modal-error').textContent = '';
-    setPositionType('public');
+    setPositionType('private');
     openModal('position-modal');
     setTimeout(() => document.getElementById('pos-ticker').focus(), 50);
+  }
+
+  function apiErrMsg(detail) {
+    if (!detail) return 'An unknown error occurred.';
+    if (Array.isArray(detail)) return detail.map(e => e.msg || JSON.stringify(e)).join('; ');
+    return String(detail);
   }
 
   async function submitPosition() {
     const thesis = document.getElementById('pos-thesis').value;
     const errEl  = document.getElementById('pos-modal-error');
     const btn    = document.getElementById('pos-submit-btn');
+    errEl.textContent = '';
 
-    if (_positionType === 'private') {
-      const company    = document.getElementById('priv-company').value.trim();
-      const investment = parseFloat(document.getElementById('priv-investment').value);
-      const entryVal   = parseFloat(document.getElementById('priv-entry-val').value);
-      const currValRaw = document.getElementById('priv-current-val').value.trim();
-      const currentValuation = currValRaw ? parseFloat(currValRaw) : null;
-      const privEntryDate       = document.getElementById('priv-entry-date').value || null;
-      const liquidityDate       = document.getElementById('priv-liquidity-date').value || null;
-      const liquidityEventType  = document.getElementById('priv-liquidity-type').value || '';
-      const notes = document.getElementById('priv-notes').value.trim();
-      if (!company)                          { errEl.textContent = 'Enter a company name.'; return; }
-      if (!investment || investment <= 0)    { errEl.textContent = 'Enter a valid investment amount.'; return; }
-      if (!entryVal   || entryVal   <= 0)   { errEl.textContent = 'Enter a valid entry valuation.'; return; }
-      btn.disabled = true; btn.textContent = 'Saving...';
-      const res = await authFetch(`/api/theses/${encodeURIComponent(thesis)}/private-positions`, {
-        method: 'POST',
-        body: JSON.stringify({ company, investment, entry_valuation: entryVal,
-                               current_valuation: currentValuation, notes, entry_date: privEntryDate,
-                               expected_liquidity_date: liquidityDate,
-                               liquidity_event_type: liquidityEventType }),
-      });
+    try {
+      if (_positionType === 'private') {
+        const company    = document.getElementById('priv-company').value.trim();
+        const investment = parseFloat(document.getElementById('priv-investment').value);
+        const entryVal   = parseFloat(document.getElementById('priv-entry-val').value);
+        const currValRaw = document.getElementById('priv-current-val').value.trim();
+        const currentValuation = currValRaw ? parseFloat(currValRaw) : null;
+        const privEntryDate      = document.getElementById('priv-entry-date').value || null;
+        const liquidityDate      = document.getElementById('priv-liquidity-date').value || null;
+        const liquidityEventType = document.getElementById('priv-liquidity-type').value || '';
+        const notes = document.getElementById('priv-notes').value.trim();
+        if (!company)                          { errEl.textContent = 'Enter a company name.'; return; }
+        if (!investment || investment <= 0)    { errEl.textContent = 'Enter a valid investment amount.'; return; }
+        if (!entryVal   || entryVal   <= 0)   { errEl.textContent = 'Enter a valid entry valuation.'; return; }
+        btn.disabled = true; btn.textContent = 'Saving...';
+        const res = await authFetch(`/api/theses/${encodeURIComponent(thesis)}/private-positions`, {
+          method: 'POST',
+          body: JSON.stringify({ company, investment, entry_valuation: entryVal,
+                                 current_valuation: currentValuation, notes, entry_date: privEntryDate,
+                                 expected_liquidity_date: liquidityDate,
+                                 liquidity_event_type: liquidityEventType }),
+        });
+        btn.disabled = false; btn.textContent = 'Add Position';
+        if (!res.ok) { errEl.textContent = apiErrMsg((await res.json()).detail); return; }
+      } else {
+        const ticker   = document.getElementById('pos-ticker').value.trim().toUpperCase();
+        const shares   = parseFloat(document.getElementById('pos-shares').value);
+        const priceRaw = document.getElementById('pos-price').value.trim();
+        const price    = priceRaw ? parseFloat(priceRaw) : null;
+        const entryDate = document.getElementById('pos-entry-date').value || null;
+        const pubNotes  = document.getElementById('pos-notes').value.trim();
+        if (!ticker)             { errEl.textContent = 'Enter a ticker symbol.'; return; }
+        if (!shares || shares<=0){ errEl.textContent = 'Enter a valid share count.'; return; }
+        btn.disabled = true; btn.textContent = 'Fetching price...';
+        const res = await authFetch(`/api/theses/${encodeURIComponent(thesis)}/positions`, {
+          method: 'POST',
+          body: JSON.stringify({ ticker, shares, price, entry_date: entryDate, notes: pubNotes }),
+        });
+        btn.disabled = false; btn.textContent = 'Add Position';
+        if (!res.ok) { errEl.textContent = apiErrMsg((await res.json()).detail); return; }
+      }
+    } catch (err) {
       btn.disabled = false; btn.textContent = 'Add Position';
-      if (!res.ok) { errEl.textContent = (await res.json()).detail || 'Error.'; return; }
-    } else {
-      const ticker   = document.getElementById('pos-ticker').value.trim().toUpperCase();
-      const shares   = parseFloat(document.getElementById('pos-shares').value);
-      const priceRaw = document.getElementById('pos-price').value.trim();
-      const price    = priceRaw ? parseFloat(priceRaw) : null;
-      const entryDate = document.getElementById('pos-entry-date').value || null;
-      if (!ticker)             { errEl.textContent = 'Enter a ticker symbol.'; return; }
-      if (!shares || shares<=0){ errEl.textContent = 'Enter a valid share count.'; return; }
-      btn.disabled = true; btn.textContent = 'Fetching price...';
-      const res = await authFetch(`/api/theses/${encodeURIComponent(thesis)}/positions`, {
-        method: 'POST',
-        body: JSON.stringify({ ticker, shares, price, entry_date: entryDate }),
-      });
-      btn.disabled = false; btn.textContent = 'Add Position';
-      if (!res.ok) { errEl.textContent = (await res.json()).detail || 'Error.'; return; }
+      errEl.textContent = err.message || 'Network error. Please try again.';
+      return;
     }
 
     closeModal('position-modal');
@@ -1243,6 +1286,93 @@
     if (!confirm(`Remove ${ticker} from watchlist?`)) return;
     await authFetch(`/api/watchlist/${encodeURIComponent(ticker)}`, { method: 'DELETE' });
     await loadData(true);
+  }
+
+  // ---------------------------------------------------------------------------
+  // File attachments
+  // ---------------------------------------------------------------------------
+
+  function fmtBytes(n) {
+    if (n < 1024) return n + ' B';
+    if (n < 1024 * 1024) return (n / 1024).toFixed(1) + ' KB';
+    return (n / (1024 * 1024)).toFixed(1) + ' MB';
+  }
+
+  async function openFiles(entityType, entityId, label) {
+    _filesTarget = { entityType, entityId, label };
+    document.getElementById('files-modal-subtitle').textContent = label;
+    document.getElementById('files-modal-error').textContent = '';
+    document.getElementById('files-upload-input').value = '';
+    await refreshFileList();
+    openModal('files-modal');
+  }
+
+  async function refreshFileList() {
+    const { entityType, entityId } = _filesTarget;
+    const res = await authFetch(`/api/attachments/${entityType}/${entityId}`);
+    const files = await res.json();
+    const listEl = document.getElementById('files-list');
+    if (!files.length) {
+      listEl.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:8px 0">No files attached yet.</div>';
+      return;
+    }
+    listEl.innerHTML = files.map(f => `
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
+        <div style="overflow:hidden">
+          <div style="font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(f.filename)}</div>
+          <div style="font-size:11px;color:var(--muted)">${fmtBytes(f.size_bytes)} &middot; ${f.uploaded_at.slice(0,10)}</div>
+        </div>
+        <div style="display:flex;gap:6px;flex-shrink:0;margin-left:12px">
+          <button class="btn btn-ghost btn-sm" onclick="downloadFile(${f.id},'${esc(f.filename)}')">Download</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteFile(${f.id})">Remove</button>
+        </div>
+      </div>`).join('');
+  }
+
+  async function uploadFile() {
+    const input = document.getElementById('files-upload-input');
+    const errEl = document.getElementById('files-modal-error');
+    const btn   = document.getElementById('files-upload-btn');
+    errEl.textContent = '';
+    if (!input.files.length) { errEl.textContent = 'Choose a file first.'; return; }
+    const { entityType, entityId } = _filesTarget;
+    const form = new FormData();
+    form.append('entity_type', entityType);
+    form.append('entity_id', entityId);
+    form.append('file', input.files[0]);
+    btn.disabled = true; btn.textContent = 'Uploading...';
+    try {
+      const token = getToken();
+      const headers = token ? { Authorization: 'Bearer ' + token } : {};
+      const res = await fetch('/api/attachments', { method: 'POST', headers, body: form });
+      if (!res.ok) { errEl.textContent = (await res.json()).detail || 'Upload failed.'; return; }
+      input.value = '';
+      await refreshFileList();
+    } catch (err) {
+      errEl.textContent = err.message || 'Network error.';
+    } finally {
+      btn.disabled = false; btn.textContent = 'Upload';
+    }
+  }
+
+  async function deleteFile(attachmentId) {
+    if (!confirm('Remove this file?')) return;
+    await authFetch(`/api/attachments/${attachmentId}`, { method: 'DELETE' });
+    await refreshFileList();
+  }
+
+  // Download helper that resolves the filename from Content-Disposition
+  async function downloadFile(attachmentId, fallbackName) {
+    const token = getToken();
+    const res = await fetch(`/api/attachments/${attachmentId}/download`,
+      { headers: token ? { Authorization: 'Bearer ' + token } : {} });
+    const cd = res.headers.get('Content-Disposition') || '';
+    const match = cd.match(/filename="?([^"]+)"?/);
+    const name = match ? match[1] : fallbackName;
+    const blob = await res.blob();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = name;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
   }
 
   // Enter key shortcuts

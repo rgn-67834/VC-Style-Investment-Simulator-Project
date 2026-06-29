@@ -45,7 +45,8 @@ def init_db() -> None:
                 ticker       TEXT    NOT NULL,
                 shares       REAL    NOT NULL,
                 entry_price  REAL    NOT NULL,
-                entry_date   TEXT    NOT NULL
+                entry_date   TEXT    NOT NULL,
+                notes        TEXT    NOT NULL DEFAULT ''
             );
 
             CREATE TABLE IF NOT EXISTS closed_positions (
@@ -92,12 +93,25 @@ def init_db() -> None:
                 added_at  TEXT    NOT NULL DEFAULT (date('now')),
                 UNIQUE (user_id, ticker)
             );
+
+            CREATE TABLE IF NOT EXISTS attachments (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                entity_type  TEXT    NOT NULL,
+                entity_id    INTEGER NOT NULL,
+                filename     TEXT    NOT NULL,
+                mime_type    TEXT    NOT NULL DEFAULT 'application/octet-stream',
+                size_bytes   INTEGER NOT NULL DEFAULT 0,
+                data         BLOB    NOT NULL,
+                uploaded_at  TEXT    NOT NULL DEFAULT (datetime('now'))
+            );
         """)
     # Add columns introduced after initial schema — safe to run repeatedly
     with get_conn() as conn:
         for sql in [
             "ALTER TABLE private_positions ADD COLUMN expected_liquidity_date TEXT",
             "ALTER TABLE private_positions ADD COLUMN liquidity_event_type TEXT NOT NULL DEFAULT ''",
+            "ALTER TABLE positions ADD COLUMN notes TEXT NOT NULL DEFAULT ''",
         ]:
             try:
                 conn.execute(sql)

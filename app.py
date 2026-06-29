@@ -8,8 +8,8 @@ import time
 from pathlib import Path
 from typing import Optional
 
-from fastapi import Depends, FastAPI, HTTPException
-from fastapi.responses import HTMLResponse
+from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile
+from fastapi.responses import HTMLResponse, Response
 from pydantic import BaseModel
 
 from auth import create_access_token, get_current_user, hash_password, verify_password
@@ -180,13 +180,14 @@ class NewPositionBody(BaseModel):
     shares: float
     price: Optional[float] = None
     entry_date: Optional[str] = None
+    notes: str = ""
 
 
 @app.post("/api/theses/{thesis_name}/positions", status_code=201)
 def api_add_position(thesis_name: str, body: NewPositionBody,
                      current_user: dict = Depends(get_current_user)):
     try:
-        buy(current_user["id"], thesis_name, body.ticker, body.shares, body.price, body.entry_date)
+        buy(current_user["id"], thesis_name, body.ticker, body.shares, body.price, body.entry_date, body.notes)
     except ValueError as e:
         raise HTTPException(400, str(e))
     _bust(current_user["id"])
@@ -317,4 +318,67 @@ def api_add_watchlist(body: WatchlistBody, current_user: dict = Depends(get_curr
 def api_remove_watchlist(ticker: str, current_user: dict = Depends(get_current_user)):
     remove_from_watchlist(current_user["id"], ticker)
     _bust(current_user["id"])
+    return {"ok": True}
+
+
+# ---------------------------------------------------------------------------
+# Attachments  (entity_type: "position" | "private_position")
+# ---------------------------------------------------------------------------
+
+@app.post("/api/attachments", status_code=201)
+async def upload_attachment(
+    entity_type: str = Form(...),
+    entity_id: int = Form(...),
+    file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user),
+):
+    data = await file.read()
+    filename = file.filename or "attachment"
+    mime = file.content_type or "application/octet-stream"
+    with get_conn() as conn:
+        conn.execute(
+            "INSERT INTO attachments (user_id, entity_type, entity_id, filename, mime_type, size_bytes, data) "
+            "VALUES (?,?,?,?,?,?,?)",
+            (current_user["id"], entity_type, entity_id, filename, mime, len(data), data),
+        )
+    return {"ok": True}
+
+
+@app.get("/api/attachments/{entity_type}/{entity_id}")
+def list_attachments(entity_type: str, entity_id: int,
+                     current_user: dict = Depends(get_current_user)):
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT id, filename, mime_type, size_bytes, uploaded_at FROM attachments "
+            "WHERE user_id=? AND entity_type=? AND entity_id=? ORDER BY uploaded_at",
+            (current_user["id"], entity_type, entity_id),
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+@app.get("/api/attachments/{attachment_id}/download")
+def download_attachment(attachment_id: int, current_user: dict = Depends(get_current_user)):
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT filename, mime_type, data FROM attachments WHERE id=? AND user_id=?",
+            (attachment_id, current_user["id"]),
+        ).fetchone()
+    if not row:
+        raise HTTPException(404, "Attachment not found.")
+    return Response(
+        content=bytes(row["data"]),
+        media_type=row["mime_type"],
+        headers={"Content-Disposition": f'attachment; filename="{row["filename"]}"'},
+    )
+
+
+@app.delete("/api/attachments/{attachment_id}")
+def delete_attachment(attachment_id: int, current_user: dict = Depends(get_current_user)):
+    with get_conn() as conn:
+        cur = conn.execute(
+            "DELETE FROM attachments WHERE id=? AND user_id=?",
+            (attachment_id, current_user["id"]),
+        )
+    if cur.rowcount == 0:
+        raise HTTPException(404, "Attachment not found.")
     return {"ok": True}

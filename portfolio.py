@@ -98,13 +98,14 @@ def list_theses(user_id: int) -> None:
 # ---------------------------------------------------------------------------
 
 def buy(user_id: int, thesis_name: str, ticker: str, shares: float,
-        price: Optional[float] = None, entry_date: Optional[str] = None) -> None:
+        price: Optional[float] = None, entry_date: Optional[str] = None,
+        notes: str = "") -> None:
     ticker = ticker.upper()
 
     if price is None:
-        price = float(yf.Ticker(ticker).fast_info.last_price or 0)
+        price = _current_price(ticker)
         if not price:
-            raise ValueError(f"Could not fetch price for {ticker}. Pass --price explicitly.")
+            raise ValueError(f"Could not fetch price for {ticker}. Try again or enter a price manually.")
         print(f"Using current price for {ticker}: ${price:,.2f}")
 
     if entry_date:
@@ -118,8 +119,8 @@ def buy(user_id: int, thesis_name: str, ticker: str, shares: float,
     with get_conn() as conn:
         thesis_id = _get_thesis_id(conn, user_id, thesis_name)
         conn.execute(
-            "INSERT INTO positions (thesis_id, ticker, shares, entry_price, entry_date) VALUES (?,?,?,?,?)",
-            (thesis_id, ticker, shares, price, entry_date)
+            "INSERT INTO positions (thesis_id, ticker, shares, entry_price, entry_date, notes) VALUES (?,?,?,?,?,?)",
+            (thesis_id, ticker, shares, price, entry_date, notes)
         )
     print(f"Added {shares} x {ticker} @ ${price:,.2f} → '{thesis_name}'")
 
@@ -429,10 +430,12 @@ def get_all_thesis_data(user_id: int) -> list[dict]:
                 total_value += value
 
                 positions_out.append({
+                    "id": pos["id"],
                     "ticker": ticker,
                     "shares": shares,
                     "entry_price": entry,
                     "entry_date": entry_date,
+                    "notes": pos["notes"] if "notes" in pos.keys() else "",
                     "current_price": current,
                     "value": value,
                     "gain": gain,
