@@ -80,19 +80,6 @@ def update_thesis_notes(user_id: int, thesis_name: str, notes: str) -> None:
         raise ValueError(f"Thesis '{thesis_name}' not found.")
 
 
-def list_theses(user_id: int) -> None:
-    with get_conn() as conn:
-        rows = conn.execute(
-            "SELECT name, created_at FROM theses WHERE user_id=? ORDER BY created_at",
-            (user_id,)
-        ).fetchall()
-    if not rows:
-        print("No theses yet.")
-        return
-    for r in rows:
-        print(f"  {r['name']}  (created {r['created_at']})")
-
-
 # ---------------------------------------------------------------------------
 # Public positions
 # ---------------------------------------------------------------------------
@@ -435,7 +422,7 @@ def get_all_thesis_data(user_id: int) -> list[dict]:
                     "shares": shares,
                     "entry_price": entry,
                     "entry_date": entry_date,
-                    "notes": pos["notes"] if "notes" in pos.keys() else "",
+                    "notes": pos["notes"],
                     "current_price": current,
                     "value": value,
                     "gain": gain,

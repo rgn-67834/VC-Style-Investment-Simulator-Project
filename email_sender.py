@@ -205,7 +205,7 @@ def build_html(theses: list[dict], watchlist_data: list[dict]) -> str:
     s = _sign(overall_gain)
 
     theses_html = "\n".join(_build_thesis_html(t) for t in theses) if theses else \
-        '<div class="card"><p class="no-data">No theses yet. Run: python portfolio.py new "My Thesis"</p></div>'
+        '<div class="card"><p class="no-data">No theses yet. Create one in the app to get started.</p></div>'
 
     return _TEMPLATE.format(
         report_date=today,
