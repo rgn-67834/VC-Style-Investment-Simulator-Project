@@ -13,6 +13,7 @@ Built with [Claude Code](https://claude.com/claude-code).
 ## What it does
 
 - **Startup pipeline** — track companies you come across before investing: where you found them, stage, status, a dated log of notes, and the contacts you met at each one. Searchable and filterable by status and source.
+- **Example data** — every new account starts with two example theses, DCF snapshots, a watchlist and a small startup pipeline, so there is something to explore straight away. The private companies and people in it are invented, and all of it can be edited or deleted.
 - **Accounts** — sign up / log in (JWT auth, bcrypt-hashed passwords), and change your password from the top bar. Each user's theses, positions, watchlist, and attachments are fully isolated.
 - **Thesis portfolios** — group positions under named investment theses (e.g., "AI Infrastructure", "Energy Transition"). Each thesis tracks its own P&L independently and supports freeform notes.
 - **Public positions** — add stocks by ticker; prices are fetched live from Yahoo Finance via yfinance. Record entry price at the time you "buy in" and track unrealized gains from there.
@@ -182,6 +183,7 @@ See [AGENTS_ROADMAP.md](AGENTS_ROADMAP.md) for planned AI agents (patent intelli
 | `database.py` | SQLite schema, migrations, Mag 7 company seed data |
 | `portfolio.py` | Thesis/position CRUD, valuation math, cap gains, DCF models |
 | `pipeline.py` | Startup pipeline: startups, notes and contacts |
+| `examples.py` | Example data loaded into new accounts |
 | `watchlist_manager.py` | Watchlist CRUD + yfinance market data |
 | `email_sender.py` | HTML newsletter builder + SMTP sender |
 | `main.py` | CLI entrypoint for sending the daily newsletter |

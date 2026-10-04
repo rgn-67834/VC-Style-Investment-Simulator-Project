@@ -20,6 +20,7 @@ from portfolio import (
     get_all_thesis_data, get_dcf_models, new_thesis, save_dcf_model,
     update_private_valuation, update_thesis_notes,
 )
+from examples import load_examples
 from pipeline import (
     STATUSES, add_contact, add_note, add_startup, delete_contact, delete_note,
     delete_startup, get_startups, update_startup,
@@ -106,6 +107,12 @@ def api_signup(body: SignupBody):
             (body.username.strip(), body.email, hash_password(body.password))
         )
         user_id = cur.lastrowid
+    # A new account starts with example data so the app is not empty.
+    # It must never block sign-up, so any failure is only logged.
+    try:
+        load_examples(user_id)
+    except Exception as e:
+        print(f"[examples] Could not load example data for user {user_id}: {e}")
     token = create_access_token(user_id, body.username.strip())
     return {"token": token, "username": body.username.strip()}
 
@@ -144,6 +151,14 @@ def api_change_password(body: ChangePasswordBody,
             (hash_password(body.new_password), current_user["id"])
         )
     return {"ok": True}
+
+
+@app.post("/api/examples")
+def api_load_examples(current_user: dict = Depends(get_current_user)):
+    """Add the example theses, watchlist and pipeline to an existing account."""
+    added = load_examples(current_user["id"])
+    _bust(current_user["id"])
+    return added
 
 
 @app.get("/api/auth/me")

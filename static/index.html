@@ -1133,10 +1133,19 @@
     const grid = document.getElementById('thesis-grid');
     if (!theses.length) {
       grid.innerHTML = `<div style="padding:48px;text-align:center;color:var(--muted);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius)">
-        No theses yet. Click <strong>+ New Thesis</strong> to get started.</div>`;
+        No theses yet. Click <strong>+ Thesis</strong> to get started, or
+        <button class="btn btn-ghost btn-sm" style="margin-left:4px" onclick="loadExamples(this)">Load example data</button></div>`;
       return;
     }
     grid.innerHTML = theses.map(thesisCardHTML).join('');
+  }
+
+  // Adds the example theses, watchlist and pipeline to this account
+  async function loadExamples(btn) {
+    btn.disabled = true; btn.textContent = 'Loading...';
+    const res = await authFetch('/api/examples', { method: 'POST' });
+    if (!res.ok) { btn.disabled = false; btn.textContent = 'Load example data'; return; }
+    await Promise.all([loadData(true), loadStartups()]);
   }
 
   function thesisCardHTML(t) {
