@@ -26,7 +26,7 @@ from pipeline import (
 )
 from watchlist_manager import add_to_watchlist, get_watchlist_data, remove_from_watchlist
 
-app = FastAPI(title="VC, PE & Public Markets Tracker")
+app = FastAPI(title="Crossover")
 
 
 @app.on_event("startup")

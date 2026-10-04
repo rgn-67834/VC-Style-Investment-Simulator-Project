@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>VC, PE &amp; Public Markets Tracker</title>
+<title>Crossover: VC, PE and public markets tracker</title>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -35,6 +35,7 @@
         padding: 0 24px; height: 56px; display: flex; align-items: center;
         justify-content: space-between; position: sticky; top: 0; z-index: 100; }
   .nav-brand { font-weight: 700; font-size: 16px; letter-spacing: -.3px; color: var(--text); }
+  .nav-tagline { font-weight: 400; font-size: 12px; color: var(--muted); margin-left: 8px; letter-spacing: 0; }
   .nav-right { display: flex; gap: 10px; align-items: center; }
   #last-updated { font-size: 12px; color: var(--muted); }
   .nav-user { font-size: 12px; color: var(--muted); padding: 0 4px; }
@@ -335,7 +336,7 @@
   <div class="modal auth-modal">
     <div id="auth-login-view">
       <div class="modal-title">Sign In</div>
-      <div class="modal-subtitle">VC, PE &amp; Public Markets Tracker. Enter your credentials to access your portfolios.</div>
+      <div class="modal-subtitle">Crossover tracks VC, PE and public market positions. Enter your credentials to access your portfolios.</div>
       <div class="form-group">
         <label>Username</label>
         <input id="auth-username" autocomplete="username" placeholder="username" />
@@ -371,7 +372,7 @@
 </div>
 
 <nav>
-  <div class="nav-brand">VC, PE &amp; Public Markets Tracker</div>
+  <div class="nav-brand">Crossover <span class="nav-tagline">VC, PE and public markets</span></div>
   <div class="nav-right">
     <span id="last-updated"></span>
     <span class="nav-user" id="nav-username"></span>

@@ -1,6 +1,6 @@
-# VC, PE & Public Markets Tracker
+# Crossover
 
-A portfolio simulation tool for venture, private equity and public market positions, with multi-user accounts. Track named investment theses, model public and private positions, attach files and notes, maintain verified company profiles, and receive daily email newsletters summarizing performance — without connecting to any brokerage.
+**VC, PE and public markets portfolio tracker.** A portfolio simulation tool for venture, private equity and public market positions, with multi-user accounts. Track named investment theses, model public and private positions, attach files and notes, maintain verified company profiles, and receive daily email newsletters summarizing performance — without connecting to any brokerage.
 
 Built with FastAPI + SQLite + vanilla HTML/JS. Deployable to Railway in one click.
 

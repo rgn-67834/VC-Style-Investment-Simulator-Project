@@ -54,7 +54,7 @@ _TEMPLATE = """\
 </head>
 <body>
 <div class="card">
-  <h1>VC, PE &amp; Public Markets Tracker</h1>
+  <h1>Crossover</h1>
   <div class="date">{report_date}</div>
   <div class="kpi">
     <div class="kpi-item">
@@ -235,7 +235,7 @@ def send_email(html: str, subject: Optional[str] = None) -> bool:
         return False
 
     if subject is None:
-        subject = f"VC, PE & Public Markets Tracker — {date.today().strftime('%b %d, %Y')}"
+        subject = f"Crossover — {date.today().strftime('%b %d, %Y')}"
 
     msg = MIMEMultipart("alternative")
     msg["Subject"] = subject
