@@ -394,6 +394,7 @@
 
   <div class="section-header">
     <div class="section-title">Investment Theses</div>
+    <button class="btn btn-ghost btn-sm" onclick="loadExamples(this)" title="Adds the example theses, watchlist and startup pipeline to this account. Anything you already have is left as it is.">+ Example data</button>
   </div>
   <div class="thesis-grid" id="thesis-grid">
     <div style="padding:40px;text-align:center;color:var(--muted)">
@@ -1144,8 +1145,15 @@
   async function loadExamples(btn) {
     btn.disabled = true; btn.textContent = 'Loading...';
     const res = await authFetch('/api/examples', { method: 'POST' });
-    if (!res.ok) { btn.disabled = false; btn.textContent = 'Load example data'; return; }
+    const label = btn.dataset.label || (btn.dataset.label = 'Example data');
+    if (!res.ok) { btn.disabled = false; btn.textContent = `+ ${label}`; return; }
+    const added = await res.json();
     await Promise.all([loadData(true), loadStartups()]);
+    // The empty-state button is gone after the reload; the header one stays
+    if (document.body.contains(btn)) {
+      btn.disabled = false;
+      btn.textContent = added.theses || added.startups ? 'Example data added' : 'Examples already in your account';
+    }
   }
 
   function thesisCardHTML(t) {
