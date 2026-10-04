@@ -20,9 +20,13 @@ from portfolio import (
     get_all_thesis_data, get_dcf_models, new_thesis, save_dcf_model,
     update_private_valuation, update_thesis_notes,
 )
+from pipeline import (
+    STATUSES, add_contact, add_note, add_startup, delete_contact, delete_note,
+    delete_startup, get_startups, update_startup,
+)
 from watchlist_manager import add_to_watchlist, get_watchlist_data, remove_from_watchlist
 
-app = FastAPI(title="Thesis Tracker")
+app = FastAPI(title="VC, PE & Public Markets Tracker")
 
 
 @app.on_event("startup")
@@ -117,6 +121,29 @@ def api_login(body: LoginBody):
         raise HTTPException(401, "Invalid username or password.")
     token = create_access_token(row["id"], row["username"])
     return {"token": token, "username": row["username"]}
+
+
+class ChangePasswordBody(BaseModel):
+    current_password: str
+    new_password: str
+
+
+@app.post("/api/auth/change-password")
+def api_change_password(body: ChangePasswordBody,
+                        current_user: dict = Depends(get_current_user)):
+    if len(body.new_password) < 6:
+        raise HTTPException(400, "New password must be at least 6 characters.")
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT password_hash FROM users WHERE id=?", (current_user["id"],)
+        ).fetchone()
+        if not verify_password(body.current_password, row["password_hash"]):
+            raise HTTPException(400, "Current password is incorrect.")
+        conn.execute(
+            "UPDATE users SET password_hash=? WHERE id=?",
+            (hash_password(body.new_password), current_user["id"])
+        )
+    return {"ok": True}
 
 
 @app.get("/api/auth/me")
@@ -564,4 +591,102 @@ def api_delete_company(company_id: int,
         if not current_user.get("is_admin") and row["created_by"] != current_user["id"]:
             raise HTTPException(403, "You can only delete companies you created.")
         conn.execute("DELETE FROM companies WHERE id=?", (company_id,))
+    return {"ok": True}
+
+
+# ---------------------------------------------------------------------------
+# Startup pipeline
+# ---------------------------------------------------------------------------
+
+class StartupBody(BaseModel):
+    name: Optional[str] = None
+    source: Optional[str] = None
+    sector: Optional[str] = None
+    stage: Optional[str] = None
+    status: Optional[str] = None
+    website: Optional[str] = None
+    description: Optional[str] = None
+
+
+class StartupNoteBody(BaseModel):
+    body: str
+
+
+class StartupContactBody(BaseModel):
+    name: str
+    role: str = ""
+    email: str = ""
+    phone: str = ""
+    linkedin: str = ""
+    notes: str = ""
+
+
+@app.get("/api/startups")
+def api_get_startups(current_user: dict = Depends(get_current_user)):
+    return {"statuses": STATUSES, "startups": get_startups(current_user["id"])}
+
+
+@app.post("/api/startups", status_code=201)
+def api_add_startup(body: StartupBody, current_user: dict = Depends(get_current_user)):
+    try:
+        startup_id = add_startup(current_user["id"], **body.model_dump(exclude_none=True))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    return {"id": startup_id}
+
+
+@app.patch("/api/startups/{startup_id}")
+def api_update_startup(startup_id: int, body: StartupBody,
+                       current_user: dict = Depends(get_current_user)):
+    try:
+        update_startup(current_user["id"], startup_id, **body.model_dump(exclude_none=True))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    return {"ok": True}
+
+
+@app.delete("/api/startups/{startup_id}")
+def api_delete_startup(startup_id: int, current_user: dict = Depends(get_current_user)):
+    try:
+        delete_startup(current_user["id"], startup_id)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    return {"ok": True}
+
+
+@app.post("/api/startups/{startup_id}/notes", status_code=201)
+def api_add_startup_note(startup_id: int, body: StartupNoteBody,
+                         current_user: dict = Depends(get_current_user)):
+    try:
+        add_note(current_user["id"], startup_id, body.body)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    return {"ok": True}
+
+
+@app.delete("/api/startup-notes/{note_id}")
+def api_delete_startup_note(note_id: int, current_user: dict = Depends(get_current_user)):
+    try:
+        delete_note(current_user["id"], note_id)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    return {"ok": True}
+
+
+@app.post("/api/startups/{startup_id}/contacts", status_code=201)
+def api_add_startup_contact(startup_id: int, body: StartupContactBody,
+                            current_user: dict = Depends(get_current_user)):
+    try:
+        add_contact(current_user["id"], startup_id, **body.model_dump())
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    return {"ok": True}
+
+
+@app.delete("/api/startup-contacts/{contact_id}")
+def api_delete_startup_contact(contact_id: int, current_user: dict = Depends(get_current_user)):
+    try:
+        delete_contact(current_user["id"], contact_id)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
     return {"ok": True}

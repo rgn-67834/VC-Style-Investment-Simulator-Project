@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Thesis Tracker</title>
+<title>VC, PE &amp; Public Markets Tracker</title>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -266,9 +266,43 @@
   .detail-field a { font-size: 13px; color: var(--accent); text-decoration: none; }
   .detail-field a:hover { text-decoration: underline; }
 
+  /* STARTUP PIPELINE */
+  .pipeline-section { margin-top: 28px; }
+  .pipeline-filters { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .pipeline-filters input { width: 200px; }
+  .pipeline-filters select { width: auto; }
+  .startup-foot { font-size: 11px; color: var(--muted); margin-top: auto; }
+  .startup-badges { display: flex; gap: 6px; flex-wrap: wrap; margin: 2px 0 14px; }
+  .sd-section-title { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .6px;
+                      color: var(--muted); margin: 20px 0 8px; display: flex; justify-content: space-between; align-items: center; }
+  .sd-item { border: 1px solid var(--border); border-radius: 7px; padding: 10px 12px; margin-bottom: 8px;
+             font-size: 13px; display: flex; gap: 10px; justify-content: space-between; align-items: flex-start; }
+  .sd-item-main { min-width: 0; flex: 1; overflow-wrap: anywhere; }
+  .sd-item-main a { color: var(--accent); text-decoration: none; }
+  .sd-item-meta { font-size: 11px; color: var(--muted); }
+  .sd-note-body { white-space: pre-wrap; }
+  .sd-form { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
+  .sd-form .full { grid-column: 1 / -1; }
+  .sd-x { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 16px; line-height: 1; padding: 2px 4px; }
+  .sd-x:hover { color: var(--red); }
+
   /* MOBILE */
   @media (max-width: 640px) {
-    nav { height: auto; flex-wrap: wrap; padding: 10px 16px; gap: 8px; }
+    .nav-brand { font-size: 15px; }
+    .nav-right .btn { flex: 1 1 auto; justify-content: center; }
+    .section-header { flex-wrap: wrap; gap: 8px; }
+    .pipeline-filters { width: 100%; }
+    .pipeline-filters input { flex: 1 1 100%; width: auto; }
+    .pipeline-filters select { flex: 1 1 0; min-width: 0; }
+    .company-grid, .priv-card-grid { grid-template-columns: 1fr; }
+    .company-search { max-width: none; }
+    .company-detail-grid, .sd-form { grid-template-columns: 1fr; }
+    .priv-card-header { flex-wrap: wrap; }
+    .priv-card-kpis { margin-left: 52px; }
+    .thesis-actions { flex-wrap: wrap; justify-content: flex-start; }
+    /* 16px stops iOS Safari from zooming the page when a field is focused */
+    input, select, textarea { font-size: 16px; }
+    nav { height: auto; flex-wrap: wrap; padding: 10px 16px; gap: 8px; position: static; }
     .nav-right { flex-wrap: wrap; gap: 6px; width: 100%; }
     #last-updated { width: 100%; order: -1; }
     .btn { font-size: 12px; padding: 6px 10px; }
@@ -301,7 +335,7 @@
   <div class="modal auth-modal">
     <div id="auth-login-view">
       <div class="modal-title">Sign In</div>
-      <div class="modal-subtitle">Enter your credentials to access your portfolios.</div>
+      <div class="modal-subtitle">VC, PE &amp; Public Markets Tracker. Enter your credentials to access your portfolios.</div>
       <div class="form-group">
         <label>Username</label>
         <input id="auth-username" autocomplete="username" placeholder="username" />
@@ -337,13 +371,14 @@
 </div>
 
 <nav>
-  <div class="nav-brand">VC Tracker</div>
+  <div class="nav-brand">VC, PE &amp; Public Markets Tracker</div>
   <div class="nav-right">
     <span id="last-updated"></span>
     <span class="nav-user" id="nav-username"></span>
     <button class="btn btn-ghost" onclick="loadData(true)" id="refresh-btn">Refresh</button>
     <button class="btn btn-ghost" onclick="openWatchlistModal()">Watchlist</button>
     <button class="btn btn-primary" onclick="openNewThesisModal()">+ Thesis</button>
+    <button class="btn btn-ghost" onclick="openPasswordModal()" id="account-btn" style="display:none">Password</button>
     <button class="btn btn-ghost" onclick="logout()" id="logout-btn" style="display:none">Sign Out</button>
   </div>
 </nav>
@@ -364,6 +399,20 @@
       <div class="spinner"></div>
       <div style="margin-top:12px">Loading portfolio data...</div>
     </div>
+  </div>
+
+  <!-- Startup Pipeline -->
+  <div class="pipeline-section">
+    <div class="section-header" style="gap:12px;flex-wrap:wrap">
+      <div class="section-title">Startup Pipeline</div>
+      <div class="pipeline-filters">
+        <input id="startup-search" placeholder="Search startups, notes, contacts..." oninput="renderStartups()" />
+        <select id="startup-status-filter" onchange="renderStartups()"><option value="">All statuses</option></select>
+        <select id="startup-source-filter" onchange="renderStartups()"><option value="">All sources</option></select>
+        <button class="btn btn-primary" onclick="openStartupModal()">+ Startup</button>
+      </div>
+    </div>
+    <div class="company-grid" id="startup-grid"></div>
   </div>
 
   <div class="watchlist-card">
@@ -449,11 +498,11 @@
       </div>
       <div class="form-group">
         <label>Shares</label>
-        <input id="pos-shares" type="number" min="0.0001" step="any" placeholder="10" />
+        <input id="pos-shares" class="money" type="text" inputmode="decimal" autocomplete="off" placeholder="10" />
       </div>
       <div class="form-group">
         <label>Entry Price (optional)</label>
-        <input id="pos-price" type="number" min="0" step="any" placeholder="Today's market price" />
+        <input id="pos-price" class="money" type="text" inputmode="decimal" autocomplete="off" placeholder="Today's market price" />
         <div class="form-hint">Leave blank to use today's market price.</div>
       </div>
       <div class="form-group">
@@ -475,17 +524,17 @@
       </div>
       <div class="form-group">
         <label>Simulated Investment ($)</label>
-        <input id="priv-investment" type="number" min="0" step="any" placeholder="$50,000.00" />
+        <input id="priv-investment" class="money" type="text" inputmode="decimal" autocomplete="off" placeholder="$50,000.00" />
         <div class="form-hint">The dollar amount you are simulating investing.</div>
       </div>
       <div class="form-group">
         <label>Company Valuation at Entry ($)</label>
-        <input id="priv-entry-val" type="number" min="0" step="any" placeholder="$500,000,000.00" />
+        <input id="priv-entry-val" class="money" type="text" inputmode="decimal" autocomplete="off" placeholder="$500,000,000.00" />
         <div class="form-hint">Sets your implied ownership %. e.g. $500,000,000.00 = $500M.</div>
       </div>
       <div class="form-group">
         <label>Current DCF Valuation ($) — optional</label>
-        <input id="priv-current-val" type="number" min="0" step="any" placeholder="Same as entry valuation" />
+        <input id="priv-current-val" class="money" type="text" inputmode="decimal" autocomplete="off" placeholder="Same as entry valuation" />
         <div class="form-hint">Leave blank to start at entry valuation. Update later with your DCF.</div>
       </div>
       <div class="form-group">
@@ -530,7 +579,7 @@
     <div class="modal-subtitle" id="close-modal-subtitle"></div>
     <div class="form-group">
       <label>Exit Price (optional)</label>
-      <input id="close-price" type="number" min="0" step="any" placeholder="Today's market price" />
+      <input id="close-price" class="money" type="text" inputmode="decimal" autocomplete="off" placeholder="Today's market price" />
       <div class="form-hint">Leave blank to use today's current market price.</div>
     </div>
     <div class="form-error" id="close-modal-error"></div>
@@ -548,7 +597,7 @@
     <div class="modal-subtitle" id="update-private-subtitle"></div>
     <div class="form-group">
       <label>New Company Valuation ($)</label>
-      <input id="update-val-input" type="number" min="0" step="any" placeholder="$700,000,000.00" />
+      <input id="update-val-input" class="money" type="text" inputmode="decimal" autocomplete="off" placeholder="$700,000,000.00" />
       <div class="form-hint">Your latest DCF estimate for the company's total valuation. e.g. $700,000,000.00 = $700M.</div>
     </div>
     <div class="form-group">
@@ -563,6 +612,101 @@
   </div>
 </div>
 
+<!-- Startup Add/Edit Modal -->
+<div class="overlay" id="startup-modal">
+  <div class="modal" style="width:520px">
+    <div class="modal-title" id="startup-modal-title">Track a Startup</div>
+    <div class="modal-subtitle">A company you are following. Add contacts and notes after saving.</div>
+    <div class="form-group">
+      <label>Name</label>
+      <input id="su-name" placeholder="Company name" />
+    </div>
+    <div class="sd-form">
+      <div>
+        <label>Where you found it</label>
+        <input id="su-source" list="su-source-list" placeholder="MIT" />
+        <datalist id="su-source-list">
+          <option value="MIT"></option>
+          <option value="MIT delta v"></option>
+          <option value="MIT $100K"></option>
+          <option value="MIT Sandbox"></option>
+          <option value="Martin Trust Center"></option>
+          <option value="MIT Sloan class"></option>
+          <option value="MIT Media Lab"></option>
+          <option value="The Engine"></option>
+        </datalist>
+      </div>
+      <div>
+        <label>Status</label>
+        <select id="su-status"></select>
+      </div>
+      <div>
+        <label>Sector</label>
+        <input id="su-sector" placeholder="Climate, AI, Biotech..." />
+      </div>
+      <div>
+        <label>Stage</label>
+        <select id="su-stage">
+          <option value="">Unknown</option>
+          <option>Idea</option><option>Pre-seed</option><option>Seed</option>
+          <option>Series A</option><option>Series B+</option>
+        </select>
+      </div>
+      <div class="full">
+        <label>Website</label>
+        <input id="su-website" placeholder="https://..." />
+      </div>
+      <div class="full">
+        <label>What they do</label>
+        <textarea id="su-description" placeholder="One or two lines on the product and why it is interesting."></textarea>
+      </div>
+    </div>
+    <div class="form-error" id="startup-modal-error"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('startup-modal')">Cancel</button>
+      <button class="btn btn-primary" id="startup-modal-btn" onclick="submitStartup()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Startup Detail Modal -->
+<div class="overlay" id="startup-detail-modal">
+  <div class="modal" style="width:600px">
+    <div id="sd-body"></div>
+    <div class="form-error" id="sd-error"></div>
+    <div class="modal-footer">
+      <button class="btn btn-danger" onclick="deleteStartup()" style="margin-right:auto">Delete</button>
+      <button class="btn btn-ghost" onclick="openStartupModal(_startupDetailId)">Edit</button>
+      <button class="btn btn-primary" onclick="closeModal('startup-detail-modal')">Done</button>
+    </div>
+  </div>
+</div>
+
+<!-- Change Password Modal -->
+<div class="overlay" id="password-modal">
+  <div class="modal">
+    <div class="modal-title">Change Password</div>
+    <div class="modal-subtitle" id="password-modal-subtitle"></div>
+    <div class="form-group">
+      <label>Current Password</label>
+      <input id="pw-current" type="password" autocomplete="current-password" />
+    </div>
+    <div class="form-group">
+      <label>New Password <span style="font-weight:400">(min 6 characters)</span></label>
+      <input id="pw-new" type="password" autocomplete="new-password" />
+    </div>
+    <div class="form-group">
+      <label>Confirm New Password</label>
+      <input id="pw-confirm" type="password" autocomplete="new-password" />
+    </div>
+    <div class="form-error" id="password-modal-error"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('password-modal')">Cancel</button>
+      <button class="btn btn-primary" id="password-modal-btn" onclick="submitPassword()">Change Password</button>
+    </div>
+  </div>
+</div>
+
 <!-- DCF Modal -->
 <div class="overlay" id="dcf-modal">
   <div class="modal" style="width:680px">
@@ -571,7 +715,7 @@
     <div class="dcf-grid">
       <div class="form-group">
         <label>Base Revenue ($, last 12 mo.)</label>
-        <input id="dcf-base-revenue" type="number" min="0" step="any" placeholder="50000000" />
+        <input id="dcf-base-revenue" class="money" type="text" inputmode="decimal" autocomplete="off" placeholder="50,000,000" />
       </div>
       <div class="form-group">
         <label>Revenue Growth (% / yr)</label>
@@ -595,7 +739,7 @@
       </div>
       <div class="form-group">
         <label>Net Debt ($, negative = net cash)</label>
-        <input id="dcf-net-debt" type="number" step="any" />
+        <input id="dcf-net-debt" class="money" type="text" inputmode="decimal" autocomplete="off" />
       </div>
       <div class="form-group" style="grid-column: span 2">
         <label>Label (optional)</label>
@@ -623,7 +767,7 @@
     <div class="modal-subtitle" id="close-private-subtitle"></div>
     <div class="form-group">
       <label>Exit Valuation ($)</label>
-      <input id="close-private-val" type="number" min="0" step="any" placeholder="$500,000,000.00" />
+      <input id="close-private-val" class="money" type="text" inputmode="decimal" autocomplete="off" placeholder="$500,000,000.00" />
       <div class="form-hint">The company's total valuation at exit. e.g. $500,000,000.00 = $500M (acquisition price, IPO market cap, write-down, etc.).</div>
     </div>
     <div class="form-error" id="close-private-error"></div>
@@ -890,6 +1034,8 @@
     clearToken();
     document.getElementById('nav-username').textContent = '';
     document.getElementById('logout-btn').style.display = 'none';
+    document.getElementById('account-btn').style.display = 'none';
+    document.getElementById('startup-grid').innerHTML = '';
     document.getElementById('thesis-grid').innerHTML = '';
     document.getElementById('watchlist-body').innerHTML = '';
     ['s-cost','s-value','s-return','s-pct'].forEach(id => document.getElementById(id).textContent = '—');
@@ -902,12 +1048,29 @@
   // ---------------------------------------------------------------------------
 
   const fmt  = n => n == null ? '—' : '$' + Number(n).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
-  const fmtB = n => { if (n == null) return '—'; const b = n/1e9; return b >= 1 ? `$${b.toFixed(2)}B` : `$${(n/1e6).toFixed(1)}M`; };
+  const fmtDec = (n, d) => Number(n).toLocaleString('en-US', {minimumFractionDigits:d, maximumFractionDigits:d});
+  // Compact dollars for valuations: $1,250.00B, $97.0M, and whole dollars with commas under $1M
+  const fmtB = n => {
+    if (n == null) return '—';
+    const a = Math.abs(n), sign = n < 0 ? '-' : '';
+    if (a >= 1e9) return `${sign}$${fmtDec(a/1e9, 2)}B`;
+    if (a >= 1e6) return `${sign}$${fmtDec(a/1e6, 1)}M`;
+    return `${sign}$${fmtDec(a, 0)}`;
+  };
+  // Number inputs: accept "1,250,000" or "$1,250,000" and show commas as you type
+  const parseNum = v => Number.parseFloat(String(v).replace(/[$,\s]/g, ''));
+  function formatMoneyInput(el) {
+    const raw = el.value;
+    const neg = raw.trim().startsWith('-') ? '-' : '';
+    const [intPart, ...rest] = raw.replace(/[^\d.]/g, '').split('.');
+    const grouped = intPart.replace(/^0+(?=\d)/, '').replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    el.value = neg + grouped + (rest.length ? '.' + rest.join('') : '');
+  }
   const fmtN = n => n == null ? '—' : Number(n).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
   const fmtPct = (n, sign=true) => {
     if (n == null) return '—';
     const s = sign && n >= 0 ? '+' : '';
-    return `${s}${Number(n).toFixed(2)}%`;
+    return `${s}${fmtDec(n, 2)}%`;
   };
   const cc = n => n >= 0 ? 'green' : 'red';
   const badge = (n, label=null) => {
@@ -1137,8 +1300,8 @@
     const termBadge = p.term === 'long-term'
       ? '<span class="badge badge-blue">LT 15%</span>'
       : '<span class="badge badge-amber">ST 24%</span>';
-    const moicBadge = `<span class="badge badge-moic">${Number(p.moic).toFixed(2)}x</span>`;
-    const gainBadge = `<span class="badge ${gainCls}">${s}${fmtPct(p.gain_pct)}</span>`;
+    const moicBadge = `<span class="badge badge-moic">${fmtDec(p.moic, 2)}x</span>`;
+    const gainBadge = `<span class="badge ${gainCls}">${fmtPct(p.gain_pct)}</span>`;
 
     // IRR badge
     let irrHtml = '<span style="color:var(--muted)">—</span>';
@@ -1183,8 +1346,8 @@
             <div class="priv-detail-item"><label>Gain / Loss</label><span class="${cc(p.gain)}">${s}${fmt(Math.abs(p.gain))}</span></div>
             <div class="priv-detail-item"><label>Entry Valuation</label><span>${fmtB(p.entry_valuation)}</span></div>
             <div class="priv-detail-item"><label>Current Valuation</label><span>${fmtB(p.current_valuation)}</span></div>
-            <div class="priv-detail-item"><label>Impl. Ownership</label><span>${Number(p.implied_ownership_pct).toFixed(4)}%</span></div>
-            <div class="priv-detail-item"><label>Days Held</label><span>${p.days_held}d</span></div>
+            <div class="priv-detail-item"><label>Impl. Ownership</label><span>${fmtDec(p.implied_ownership_pct, 4)}%</span></div>
+            <div class="priv-detail-item"><label>Days Held</label><span>${Number(p.days_held).toLocaleString('en-US')}d</span></div>
             <div class="priv-detail-item"><label>Proj. IRR</label><span>${irrHtml}</span></div>
             <div class="priv-detail-item"><label>Cap Gains</label><span>${termBadge}</span></div>
             <div class="priv-detail-item" style="grid-column:1/-1"><label>Expected Exit</label><span>${exitHtml}</span></div>
@@ -1210,7 +1373,7 @@
     const termBadge = p.term === 'long-term'
       ? '<span class="badge badge-blue">LT</span>'
       : '<span class="badge badge-amber">ST</span>';
-    const moicBadge = `<span class="badge badge-moic">${Number(p.moic).toFixed(2)}x</span>`;
+    const moicBadge = `<span class="badge badge-moic">${fmtDec(p.moic, 2)}x</span>`;
     return `<tr>
       <td class="ticker-cell">${esc(p.company)}</td>
       <td class="num" style="font-size:12px;color:var(--muted)">${p.exit_date}</td>
@@ -1384,10 +1547,10 @@
     try {
       if (_positionType === 'private') {
         const company    = document.getElementById('priv-company').value.trim();
-        const investment = parseFloat(document.getElementById('priv-investment').value);
-        const entryVal   = parseFloat(document.getElementById('priv-entry-val').value);
+        const investment = parseNum(document.getElementById('priv-investment').value);
+        const entryVal   = parseNum(document.getElementById('priv-entry-val').value);
         const currValRaw = document.getElementById('priv-current-val').value.trim();
-        const currentValuation = currValRaw ? parseFloat(currValRaw) : null;
+        const currentValuation = currValRaw ? parseNum(currValRaw) : null;
         const privEntryDate      = document.getElementById('priv-entry-date').value || null;
         const liquidityDate      = document.getElementById('priv-liquidity-date').value || null;
         const liquidityEventType = document.getElementById('priv-liquidity-type').value || '';
@@ -1407,9 +1570,9 @@
         if (!res.ok) { errEl.textContent = apiErrMsg((await res.json()).detail); return; }
       } else {
         const ticker   = document.getElementById('pos-ticker').value.trim().toUpperCase();
-        const shares   = parseFloat(document.getElementById('pos-shares').value);
+        const shares   = parseNum(document.getElementById('pos-shares').value);
         const priceRaw = document.getElementById('pos-price').value.trim();
-        const price    = priceRaw ? parseFloat(priceRaw) : null;
+        const price    = priceRaw ? parseNum(priceRaw) : null;
         const entryDate = document.getElementById('pos-entry-date').value || null;
         const pubNotes  = document.getElementById('pos-notes').value.trim();
         if (!ticker)             { errEl.textContent = 'Enter a ticker symbol.'; return; }
@@ -1446,7 +1609,7 @@
   }
   async function submitClose() {
     const priceRaw   = document.getElementById('close-price').value.trim();
-    const exit_price = priceRaw ? parseFloat(priceRaw) : null;
+    const exit_price = priceRaw ? parseNum(priceRaw) : null;
     const errEl = document.getElementById('close-modal-error');
     const btn   = document.getElementById('close-submit-btn');
     btn.disabled = true; btn.textContent = 'Closing...';
@@ -1485,7 +1648,7 @@
     setTimeout(() => document.getElementById('update-val-input').focus(), 50);
   }
   async function submitUpdatePrivate() {
-    const val   = parseFloat(document.getElementById('update-val-input').value);
+    const val   = parseNum(document.getElementById('update-val-input').value);
     const notes = document.getElementById('update-notes-input').value.trim() || null;
     const errEl = document.getElementById('update-private-error');
     if (!val || val <= 0) { errEl.textContent = 'Enter a valid valuation.'; return; }
@@ -1526,13 +1689,15 @@
   function fillDcfForm(values) {
     for (const [key, id, isPct] of DCF_FIELDS) {
       const v = values[key];
-      document.getElementById(id).value = (v === '' || v == null) ? '' : (isPct ? +(v * 100).toFixed(4) : v);
+      const el = document.getElementById(id);
+      el.value = (v === '' || v == null) ? '' : (isPct ? +(v * 100).toFixed(4) : v);
+      if (el.classList.contains('money')) formatMoneyInput(el);
     }
   }
   function readDcfForm() {
     const out = {};
     for (const [key, id, isPct] of DCF_FIELDS) {
-      const v = parseFloat(document.getElementById(id).value);
+      const v = parseNum(document.getElementById(id).value);
       if (Number.isNaN(v)) return null;
       out[key] = isPct ? v / 100 : v;
     }
@@ -1653,6 +1818,235 @@
     });
   });
 
+  // Change password
+  function openPasswordModal() {
+    ['pw-current', 'pw-new', 'pw-confirm'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('password-modal-subtitle').textContent = `Signed in as ${_currentUser ? _currentUser.username : ''}.`;
+    document.getElementById('password-modal-error').textContent = '';
+    openModal('password-modal');
+  }
+  async function submitPassword() {
+    const errEl = document.getElementById('password-modal-error');
+    const current = document.getElementById('pw-current').value;
+    const next    = document.getElementById('pw-new').value;
+    if (next.length < 6) { errEl.textContent = 'New password must be at least 6 characters.'; return; }
+    if (next !== document.getElementById('pw-confirm').value) { errEl.textContent = 'The new passwords do not match.'; return; }
+    const btn = document.getElementById('password-modal-btn');
+    btn.disabled = true;
+    const res = await authFetch('/api/auth/change-password', {
+      method: 'POST', body: JSON.stringify({ current_password: current, new_password: next }),
+    });
+    btn.disabled = false;
+    if (!res.ok) { errEl.textContent = apiErrMsg((await res.json()).detail); return; }
+    closeModal('password-modal');
+    alert('Password changed.');
+  }
+
+  // Startup pipeline
+  let _startups = [], _startupStatuses = [], _startupDetailId = null, _editingStartupId = null;
+  const STATUS_BADGE = { 'Watching': 'badge-gray', 'Met': 'badge-blue', 'In diligence': 'badge-amber',
+                         'Invested': 'badge-green', 'Passed': 'badge-red' };
+  const statusBadge = st => `<span class="badge ${STATUS_BADGE[st] || 'badge-gray'}">${esc(st)}</span>`;
+  // Only http(s) links are ever rendered as links
+  function safeUrl(u) {
+    if (!u) return '';
+    const url = /^https?:\/\//i.test(u) ? u : 'https://' + u;
+    return /^https?:\/\/[^\s"'<>]+$/i.test(url) ? url : '';
+  }
+  const fmtDate = iso => new Date(iso.replace(' ', 'T') + 'Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+
+  async function loadStartups() {
+    const res = await authFetch('/api/startups');
+    if (!res.ok) return;
+    const data = await res.json();
+    _startups = data.startups; _startupStatuses = data.statuses;
+    const opts = _startupStatuses.map(st => `<option>${esc(st)}</option>`).join('');
+    const statusFilter = document.getElementById('startup-status-filter');
+    const keepStatus = statusFilter.value;
+    statusFilter.innerHTML = '<option value="">All statuses</option>' + opts;
+    statusFilter.value = keepStatus;
+    document.getElementById('su-status').innerHTML = opts;
+    const sourceFilter = document.getElementById('startup-source-filter');
+    const keepSource = sourceFilter.value;
+    const sources = [...new Set(_startups.map(x => x.source).filter(Boolean))].sort();
+    sourceFilter.innerHTML = '<option value="">All sources</option>' + sources.map(x => `<option>${esc(x)}</option>`).join('');
+    sourceFilter.value = sources.includes(keepSource) ? keepSource : '';
+    renderStartups();
+    if (_startupDetailId && document.getElementById('startup-detail-modal').classList.contains('open')) renderStartupDetail();
+  }
+  function renderStartups() {
+    const grid   = document.getElementById('startup-grid');
+    const q      = document.getElementById('startup-search').value.trim().toLowerCase();
+    const status = document.getElementById('startup-status-filter').value;
+    const source = document.getElementById('startup-source-filter').value;
+    const list = _startups.filter(x => {
+      if (status && x.status !== status) return false;
+      if (source && x.source !== source) return false;
+      if (!q) return true;
+      const hay = [x.name, x.source, x.sector, x.stage, x.description,
+                   ...x.notes.map(n => n.body), ...x.contacts.flatMap(c => [c.name, c.role, c.email, c.notes])];
+      return hay.join(' ').toLowerCase().includes(q);
+    });
+    if (!_startups.length) {
+      grid.innerHTML = `<div style="grid-column:1/-1;padding:32px;text-align:center;color:var(--muted)">
+        No startups yet. Click <strong>+ Startup</strong> to track a company you have come across, then add the people you met and notes from each conversation.</div>`;
+      return;
+    }
+    if (!list.length) {
+      grid.innerHTML = `<div style="grid-column:1/-1;padding:32px;text-align:center;color:var(--muted)">No startups match these filters.</div>`;
+      return;
+    }
+    const plural = (n, word) => `${n.toLocaleString('en-US')} ${word}${n === 1 ? '' : 's'}`;
+    grid.innerHTML = list.map(x => {
+      const meta = [x.source, x.stage, x.sector].filter(Boolean).map(esc).join(' · ');
+      return `
+        <div class="company-card" onclick="openStartupDetail(${x.id})">
+          <div class="company-card-header">
+            <div class="company-avatar" style="background:${avatarColor(x.name)}">${esc(avatarInitials(x.name))}</div>
+            <div style="flex:1;min-width:0">
+              <div class="company-name-row"><span class="company-name">${esc(x.name)}</span>${statusBadge(x.status)}</div>
+              <div class="company-meta">${meta}</div>
+            </div>
+          </div>
+          ${x.description ? `<div class="company-desc">${esc(x.description)}</div>` : ''}
+          <div class="startup-foot">${plural(x.contacts.length, 'contact')} · ${plural(x.notes.length, 'note')} · updated ${fmtDate(x.updated_at)}</div>
+        </div>`;
+    }).join('');
+  }
+
+  function openStartupModal(id = null) {
+    _editingStartupId = id;
+    const x = id ? _startups.find(st => st.id === id) : null;
+    document.getElementById('startup-modal-title').textContent = x ? `Edit ${x.name}` : 'Track a Startup';
+    document.getElementById('su-name').value        = x ? x.name : '';
+    document.getElementById('su-source').value      = x ? x.source : 'MIT';
+    document.getElementById('su-status').value      = x ? x.status : _startupStatuses[0];
+    document.getElementById('su-sector').value      = x ? x.sector : '';
+    document.getElementById('su-stage').value       = x ? x.stage : '';
+    document.getElementById('su-website').value     = x ? x.website : '';
+    document.getElementById('su-description').value = x ? x.description : '';
+    document.getElementById('startup-modal-error').textContent = '';
+    openModal('startup-modal');
+    if (!x) setTimeout(() => document.getElementById('su-name').focus(), 50);
+  }
+  async function submitStartup() {
+    const errEl = document.getElementById('startup-modal-error');
+    const val = id => document.getElementById(id).value.trim();
+    const body = { name: val('su-name'), source: val('su-source'), status: val('su-status'), sector: val('su-sector'),
+                   stage: val('su-stage'), website: val('su-website'), description: val('su-description') };
+    if (!body.name) { errEl.textContent = 'Enter the startup name.'; return; }
+    const btn = document.getElementById('startup-modal-btn');
+    btn.disabled = true;
+    const res = await authFetch(_editingStartupId ? `/api/startups/${_editingStartupId}` : '/api/startups',
+      { method: _editingStartupId ? 'PATCH' : 'POST', body: JSON.stringify(body) });
+    btn.disabled = false;
+    const data = await res.json();
+    if (!res.ok) { errEl.textContent = apiErrMsg(data.detail); return; }
+    const wasNew = !_editingStartupId;
+    closeModal('startup-modal');
+    await loadStartups();
+    // Go straight to the new startup so contacts and notes can be added
+    if (wasNew) openStartupDetail(data.id);
+  }
+
+  function openStartupDetail(id) {
+    _startupDetailId = id;
+    document.getElementById('sd-error').textContent = '';
+    renderStartupDetail();
+    openModal('startup-detail-modal');
+  }
+  function renderStartupDetail() {
+    const x = _startups.find(st => st.id === _startupDetailId);
+    if (!x) { closeModal('startup-detail-modal'); return; }
+    const site = safeUrl(x.website);
+    const contacts = x.contacts.map(c => {
+      const li = safeUrl(c.linkedin);
+      const lines = [
+        c.email ? `<a href="mailto:${esc(c.email)}">${esc(c.email)}</a>` : '',
+        c.phone ? `<a href="tel:${esc(c.phone.replace(/[^\d+]/g, ''))}">${esc(c.phone)}</a>` : '',
+        li ? `<a href="${esc(li)}" target="_blank" rel="noopener">LinkedIn</a>` : '',
+      ].filter(Boolean).join(' · ');
+      return `<div class="sd-item">
+        <div class="sd-item-main">
+          <strong>${esc(c.name)}</strong>${c.role ? ` <span class="sd-item-meta">${esc(c.role)}</span>` : ''}
+          ${lines ? `<div>${lines}</div>` : ''}
+          ${c.notes ? `<div class="sd-item-meta">${esc(c.notes)}</div>` : ''}
+        </div>
+        <button class="sd-x" title="Remove contact" onclick="deleteStartupContact(${c.id})">&times;</button>
+      </div>`;
+    }).join('');
+    const notes = x.notes.map(n => `<div class="sd-item">
+        <div class="sd-item-main">
+          <div class="sd-item-meta">${fmtDate(n.created_at)}</div>
+          <div class="sd-note-body">${esc(n.body)}</div>
+        </div>
+        <button class="sd-x" title="Delete note" onclick="deleteStartupNote(${n.id})">&times;</button>
+      </div>`).join('');
+    document.getElementById('sd-body').innerHTML = `
+      <div class="company-detail-header" style="margin-bottom:10px">
+        <div class="company-detail-avatar" style="background:${avatarColor(x.name)}">${esc(avatarInitials(x.name))}</div>
+        <div style="min-width:0">
+          <div class="modal-title" style="font-size:18px">${esc(x.name)}</div>
+          <div class="startup-badges">
+            ${statusBadge(x.status)}
+            ${[x.source, x.stage, x.sector].filter(Boolean).map(v => `<span class="badge badge-gray">${esc(v)}</span>`).join('')}
+          </div>
+          ${site ? `<div class="detail-field"><a href="${esc(site)}" target="_blank" rel="noopener">${esc(x.website)}</a></div>` : ''}
+        </div>
+      </div>
+      ${x.description ? `<div style="font-size:13px;line-height:1.55">${esc(x.description)}</div>` : ''}
+
+      <div class="sd-section-title">Contacts</div>
+      ${contacts || '<div class="form-hint" style="margin-bottom:8px">No contacts yet.</div>'}
+      <div class="sd-form">
+        <input id="sc-name" placeholder="Name" />
+        <input id="sc-role" placeholder="Role (e.g. Co-founder, CEO)" />
+        <input id="sc-email" type="email" placeholder="Email" />
+        <input id="sc-phone" type="tel" placeholder="Phone" />
+        <input id="sc-linkedin" class="full" placeholder="LinkedIn URL" />
+        <input id="sc-notes" class="full" placeholder="How you met, what to follow up on" />
+      </div>
+      <button class="btn btn-ghost btn-sm" onclick="addStartupContact()">+ Add contact</button>
+
+      <div class="sd-section-title">Notes</div>
+      <textarea id="sn-body" placeholder="What you learned, what they need, what to do next..."></textarea>
+      <button class="btn btn-ghost btn-sm" style="margin:8px 0 12px" onclick="addStartupNote()">+ Add note</button>
+      ${notes || '<div class="form-hint">No notes yet. Each note is saved with today\'s date.</div>'}`;
+  }
+  async function startupAction(url, opts) {
+    const errEl = document.getElementById('sd-error');
+    const res = await authFetch(url, opts);
+    if (!res.ok) { errEl.textContent = apiErrMsg((await res.json()).detail); return false; }
+    errEl.textContent = '';
+    await loadStartups();
+    return true;
+  }
+  function addStartupContact() {
+    const val = id => document.getElementById(id).value.trim();
+    const body = { name: val('sc-name'), role: val('sc-role'), email: val('sc-email'),
+                   phone: val('sc-phone'), linkedin: val('sc-linkedin'), notes: val('sc-notes') };
+    if (!body.name) { document.getElementById('sd-error').textContent = 'Enter the contact\'s name.'; return; }
+    return startupAction(`/api/startups/${_startupDetailId}/contacts`, { method: 'POST', body: JSON.stringify(body) });
+  }
+  function addStartupNote() {
+    const body = document.getElementById('sn-body').value.trim();
+    if (!body) { document.getElementById('sd-error').textContent = 'Write the note first.'; return; }
+    return startupAction(`/api/startups/${_startupDetailId}/notes`, { method: 'POST', body: JSON.stringify({ body }) });
+  }
+  function deleteStartupContact(id) {
+    if (!confirm('Remove this contact?')) return;
+    return startupAction(`/api/startup-contacts/${id}`, { method: 'DELETE' });
+  }
+  function deleteStartupNote(id) {
+    if (!confirm('Delete this note?')) return;
+    return startupAction(`/api/startup-notes/${id}`, { method: 'DELETE' });
+  }
+  async function deleteStartup() {
+    const x = _startups.find(st => st.id === _startupDetailId);
+    if (!x || !confirm(`Delete ${x.name} with all its contacts and notes? This cannot be undone.`)) return;
+    if (await startupAction(`/api/startups/${x.id}`, { method: 'DELETE' })) closeModal('startup-detail-modal');
+  }
+
   // Close / exit private
   function openClosePrivate(thesis, company) {
     _closePrivTarget = { thesis, company };
@@ -1664,7 +2058,7 @@
     setTimeout(() => document.getElementById('close-private-val').focus(), 50);
   }
   async function submitClosePrivate() {
-    const val   = parseFloat(document.getElementById('close-private-val').value);
+    const val   = parseNum(document.getElementById('close-private-val').value);
     const errEl = document.getElementById('close-private-error');
     if (!val || val <= 0) { errEl.textContent = 'Enter the exit valuation.'; return; }
     const btn = document.getElementById('close-private-btn');
@@ -2137,6 +2531,10 @@
     await loadCompanies();
   }
 
+  document.querySelectorAll('input.money').forEach(el => {
+    el.addEventListener('input', () => formatMoneyInput(el));
+  });
+
   // Enter key shortcuts
   document.getElementById('auth-password').addEventListener('keydown',     e => { if(e.key==='Enter') submitLogin(); });
   document.getElementById('signup-password').addEventListener('keydown',   e => { if(e.key==='Enter') submitSignup(); });
@@ -2161,7 +2559,9 @@
     _currentUser = data;
     document.getElementById('nav-username').textContent = data.username;
     document.getElementById('logout-btn').style.display = '';
+    document.getElementById('account-btn').style.display = '';
     loadData();
+    loadStartups();
     loadCompanies();
   }
 

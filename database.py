@@ -142,6 +142,40 @@ def init_db() -> None:
                 equity_value         REAL    NOT NULL,
                 created_at           TEXT    NOT NULL DEFAULT (datetime('now'))
             );
+
+            CREATE TABLE IF NOT EXISTS startups (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                name         TEXT    NOT NULL,
+                source       TEXT    NOT NULL DEFAULT '',
+                sector       TEXT    NOT NULL DEFAULT '',
+                stage        TEXT    NOT NULL DEFAULT '',
+                status       TEXT    NOT NULL DEFAULT 'Watching',
+                website      TEXT    NOT NULL DEFAULT '',
+                description  TEXT    NOT NULL DEFAULT '',
+                created_at   TEXT    NOT NULL DEFAULT (datetime('now')),
+                updated_at   TEXT    NOT NULL DEFAULT (datetime('now')),
+                UNIQUE (user_id, name)
+            );
+
+            CREATE TABLE IF NOT EXISTS startup_notes (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                startup_id  INTEGER NOT NULL REFERENCES startups(id) ON DELETE CASCADE,
+                body        TEXT    NOT NULL,
+                created_at  TEXT    NOT NULL DEFAULT (datetime('now'))
+            );
+
+            CREATE TABLE IF NOT EXISTS startup_contacts (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                startup_id  INTEGER NOT NULL REFERENCES startups(id) ON DELETE CASCADE,
+                name        TEXT    NOT NULL,
+                role        TEXT    NOT NULL DEFAULT '',
+                email       TEXT    NOT NULL DEFAULT '',
+                phone       TEXT    NOT NULL DEFAULT '',
+                linkedin    TEXT    NOT NULL DEFAULT '',
+                notes       TEXT    NOT NULL DEFAULT '',
+                created_at  TEXT    NOT NULL DEFAULT (datetime('now'))
+            );
         """)
     # Add columns introduced after initial schema — safe to run repeatedly
     with get_conn() as conn:
@@ -270,10 +304,15 @@ def migrate_from_json() -> None:
     import bcrypt as _bcrypt
 
     with get_conn() as conn:
-        default_password = os.getenv("MIGRATE_DEFAULT_PASSWORD", "changeme")
+        # The imported data belongs to an 'admin' user. That user is only created
+        # when MIGRATE_DEFAULT_PASSWORD is set: there is no built-in default password.
+        default_password = os.getenv("MIGRATE_DEFAULT_PASSWORD")
         existing = conn.execute("SELECT id FROM users WHERE username = 'admin'").fetchone()
         if existing:
             user_id = existing["id"]
+        elif not default_password:
+            print("[migrate] Skipping JSON import: set MIGRATE_DEFAULT_PASSWORD to create the 'admin' user that owns it.")
+            return
         else:
             pw_hash = _bcrypt.hashpw(default_password[:72].encode(), _bcrypt.gensalt()).decode()
             cur = conn.execute(
@@ -281,8 +320,7 @@ def migrate_from_json() -> None:
                 (pw_hash,)
             )
             user_id = cur.lastrowid
-            print(f"[migrate] Created default user 'admin' (password: {default_password})")
-            print("[migrate] IMPORTANT: Change this password after first login.")
+            print("[migrate] Created user 'admin' with the password from MIGRATE_DEFAULT_PASSWORD.")
 
         if _PORTFOLIOS_JSON.exists():
             data = json.loads(_PORTFOLIOS_JSON.read_text())

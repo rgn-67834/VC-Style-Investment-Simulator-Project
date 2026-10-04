@@ -1,6 +1,6 @@
-# VC-Trading Simulator
+# VC, PE & Public Markets Tracker
 
-A VC-style portfolio simulation tool with multi-user accounts. Track named investment theses, model public and private positions, attach files and notes, maintain verified company profiles, and receive daily email newsletters summarizing performance — without connecting to any brokerage.
+A portfolio simulation tool for venture, private equity and public market positions, with multi-user accounts. Track named investment theses, model public and private positions, attach files and notes, maintain verified company profiles, and receive daily email newsletters summarizing performance — without connecting to any brokerage.
 
 Built with FastAPI + SQLite + vanilla HTML/JS. Deployable to Railway in one click.
 
@@ -12,7 +12,8 @@ Built with [Claude Code](https://claude.com/claude-code).
 
 ## What it does
 
-- **Accounts** — sign up / log in (JWT auth, bcrypt-hashed passwords). Each user's theses, positions, watchlist, and attachments are fully isolated.
+- **Startup pipeline** — track companies you come across before investing: where you found them, stage, status, a dated log of notes, and the contacts you met at each one. Searchable and filterable by status and source.
+- **Accounts** — sign up / log in (JWT auth, bcrypt-hashed passwords), and change your password from the top bar. Each user's theses, positions, watchlist, and attachments are fully isolated.
 - **Thesis portfolios** — group positions under named investment theses (e.g., "AI Infrastructure", "Energy Transition"). Each thesis tracks its own P&L independently and supports freeform notes.
 - **Public positions** — add stocks by ticker; prices are fetched live from Yahoo Finance via yfinance. Record entry price at the time you "buy in" and track unrealized gains from there.
 - **Private / startup positions** — add companies with an investment amount and entry valuation, expected liquidity date, and liquidity event type (IPO, acquisition, secondary, etc.). Update the valuation whenever you re-run your model. Implied ownership % is locked at entry and applied against the current valuation to compute current value, MOIC, projected IRR, and estimated gain. Shown as expandable cards in the UI.
@@ -91,6 +92,10 @@ Click **"+ Add Position"** on any thesis card. Toggle between **Private / Startu
 ### Updating a private valuation
 
 Click **Edit** on any private position card to open the valuation update modal. Enter your new company valuation and optional notes. The current value, gain, MOIC, and projected IRR update immediately.
+
+### Startup pipeline
+
+Click **+ Startup** in the Startup Pipeline section to track a company: name, where you found it (suggestions include MIT programs such as delta v, the $100K and Sandbox), sector, stage, status and a short description. Opening a startup shows its contacts (name, role, email, phone, LinkedIn, and how you met) and a notes log where each entry is saved with its date. The search box looks through names, notes and contacts. Pipeline entries are private to your account.
 
 ### DCF models
 
@@ -175,7 +180,8 @@ See [AGENTS_ROADMAP.md](AGENTS_ROADMAP.md) for planned AI agents (patent intelli
 | `app.py` | FastAPI server — all REST endpoints, auth, attachments, company profiles |
 | `auth.py` | JWT token creation/validation, password hashing |
 | `database.py` | SQLite schema, migrations, Mag 7 company seed data |
-| `portfolio.py` | Thesis/position CRUD, valuation math, cap gains |
+| `portfolio.py` | Thesis/position CRUD, valuation math, cap gains, DCF models |
+| `pipeline.py` | Startup pipeline: startups, notes and contacts |
 | `watchlist_manager.py` | Watchlist CRUD + yfinance market data |
 | `email_sender.py` | HTML newsletter builder + SMTP sender |
 | `main.py` | CLI entrypoint for sending the daily newsletter |
