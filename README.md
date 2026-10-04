@@ -16,6 +16,7 @@ Built with [Claude Code](https://claude.com/claude-code).
 - **Thesis portfolios** — group positions under named investment theses (e.g., "AI Infrastructure", "Energy Transition"). Each thesis tracks its own P&L independently and supports freeform notes.
 - **Public positions** — add stocks by ticker; prices are fetched live from Yahoo Finance via yfinance. Record entry price at the time you "buy in" and track unrealized gains from there.
 - **Private / startup positions** — add companies with an investment amount and entry valuation, expected liquidity date, and liquidity event type (IPO, acquisition, secondary, etc.). Update the valuation whenever you re-run your model. Implied ownership % is locked at entry and applied against the current valuation to compute current value, MOIC, projected IRR, and estimated gain. Shown as expandable cards in the UI.
+- **DCF models** — build a simple discounted cash flow valuation for any private position and save dated snapshots of the assumptions, so you can see how your valuation case changed over time. A snapshot can optionally become the position's current valuation.
 - **Closed position history** — when you exit a position, it moves to a "Closed" section showing your actual gain alongside a live "if still held" comparison so you can see whether you sold at the right time.
 - **Capital gains estimates** — positions held < 365 days are flagged ST (24%), ≥ 365 days LT (15%). After-tax gain is shown for both open and closed positions.
 - **Notes & file attachments** — every position can carry freeform notes and uploaded files (decks, memos, cap tables). Files can be previewed in-browser (images, PDFs, text) or downloaded.
@@ -90,6 +91,14 @@ Click **"+ Add Position"** on any thesis card. Toggle between **Private / Startu
 ### Updating a private valuation
 
 Click **Edit** on any private position card to open the valuation update modal. Enter your new company valuation and optional notes. The current value, gain, MOIC, and projected IRR update immediately.
+
+### DCF models
+
+Click **DCF** on any private position card. Enter base revenue, revenue growth, free cash flow margin, discount rate, terminal growth, projection years and net debt; the enterprise value, equity value and the share of value coming from the terminal period update as you type.
+
+**Save Snapshot** stores the assumptions and the resulting value with today's date. The snapshot table shows every saved version with the change in equity value from the one before it, and **Load** copies a past snapshot back into the form. Tick the checkbox before saving to also set the equity value as the position's current valuation.
+
+The model is intentionally basic: one growth rate, one margin, and a Gordon-growth terminal value. Snapshots belong to the open position and are removed when it is exited or deleted.
 
 ### Files
 

@@ -15,9 +15,10 @@ from pydantic import BaseModel
 from auth import create_access_token, get_current_user, hash_password, verify_password
 from database import get_conn, init_db
 from portfolio import (
-    add_private_position, buy, close_position, close_private_position,
-    delete_position, delete_private_position, delete_thesis, get_all_thesis_data,
-    new_thesis, update_private_valuation, update_thesis_notes,
+    add_private_position, buy, close_position, close_private_position, compute_dcf,
+    delete_dcf_model, delete_position, delete_private_position, delete_thesis,
+    get_all_thesis_data, get_dcf_models, new_thesis, save_dcf_model,
+    update_private_valuation, update_thesis_notes,
 )
 from watchlist_manager import add_to_watchlist, get_watchlist_data, remove_from_watchlist
 
@@ -296,6 +297,63 @@ def api_delete_private(thesis_name: str, company: str,
     except ValueError as e:
         raise HTTPException(400, str(e))
     _bust(current_user["id"])
+    return {"ok": True}
+
+
+# ---------------------------------------------------------------------------
+# DCF models
+# ---------------------------------------------------------------------------
+
+class DcfAssumptions(BaseModel):
+    base_revenue: float
+    revenue_growth: float
+    fcf_margin: float
+    discount_rate: float
+    terminal_growth: float
+    years: int
+    net_debt: float = 0.0
+
+
+class SaveDcfBody(DcfAssumptions):
+    label: str = ""
+    apply_valuation: bool = False
+
+
+@app.post("/api/dcf/preview")
+def api_dcf_preview(body: DcfAssumptions, current_user: dict = Depends(get_current_user)):
+    try:
+        return compute_dcf(**body.model_dump())
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.get("/api/theses/{thesis_name}/private-positions/{company}/dcf")
+def api_get_dcf(thesis_name: str, company: str,
+                current_user: dict = Depends(get_current_user)):
+    try:
+        return get_dcf_models(current_user["id"], thesis_name, company)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.post("/api/theses/{thesis_name}/private-positions/{company}/dcf", status_code=201)
+def api_save_dcf(thesis_name: str, company: str, body: SaveDcfBody,
+                 current_user: dict = Depends(get_current_user)):
+    try:
+        result = save_dcf_model(current_user["id"], thesis_name, company, **body.model_dump())
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    if body.apply_valuation:
+        _bust(current_user["id"])
+    return result
+
+
+@app.delete("/api/dcf/{model_id}")
+def api_delete_dcf(model_id: int, current_user: dict = Depends(get_current_user)):
+    try:
+        delete_dcf_model(current_user["id"], model_id)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
     return {"ok": True}
 
 

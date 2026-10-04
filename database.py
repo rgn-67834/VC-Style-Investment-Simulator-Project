@@ -126,6 +126,22 @@ def init_db() -> None:
                 data         BLOB    NOT NULL,
                 uploaded_at  TEXT    NOT NULL DEFAULT (datetime('now'))
             );
+
+            CREATE TABLE IF NOT EXISTS dcf_models (
+                id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+                private_position_id  INTEGER NOT NULL REFERENCES private_positions(id) ON DELETE CASCADE,
+                label                TEXT    NOT NULL DEFAULT '',
+                base_revenue         REAL    NOT NULL,
+                revenue_growth       REAL    NOT NULL,
+                fcf_margin           REAL    NOT NULL,
+                discount_rate        REAL    NOT NULL,
+                terminal_growth      REAL    NOT NULL,
+                years                INTEGER NOT NULL,
+                net_debt             REAL    NOT NULL DEFAULT 0,
+                enterprise_value     REAL    NOT NULL,
+                equity_value         REAL    NOT NULL,
+                created_at           TEXT    NOT NULL DEFAULT (datetime('now'))
+            );
         """)
     # Add columns introduced after initial schema — safe to run repeatedly
     with get_conn() as conn:

@@ -191,6 +191,22 @@
   .form-hint { font-size: 11px; color: var(--muted); margin-top: 4px; }
   .form-error { font-size: 12px; color: var(--red); margin-top: 12px; min-height: 18px; }
 
+  /* DCF MODAL */
+  .dcf-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0 12px; }
+  .dcf-result { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
+                background: var(--blue-bg); border-radius: 8px; padding: 12px 14px; margin-top: 4px; }
+  .dcf-result label { margin-bottom: 2px; }
+  .dcf-result span { font-size: 15px; font-weight: 700; }
+  .dcf-result .dcf-sub { font-size: 11px; font-weight: 400; color: var(--muted); display: block; }
+  .dcf-history { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 8px; }
+  .dcf-history th { text-align: left; font-weight: 500; color: var(--muted); padding: 4px 6px;
+                    border-bottom: 1px solid var(--border); white-space: nowrap; }
+  .dcf-history td { padding: 6px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  .dcf-history-wrap { overflow-x: auto; }
+  .dcf-check { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text); margin: 12px 0 0; }
+  .dcf-check input { width: auto; }
+  @media (max-width: 640px) { .dcf-grid, .dcf-result { grid-template-columns: repeat(2, 1fr); } }
+
   /* INFO BOX */
   .info-box { background: var(--blue-bg); border-radius: 8px; padding: 12px 14px;
               font-size: 13px; color: var(--blue); margin-top: 16px; line-height: 1.6; }
@@ -544,6 +560,59 @@
       <button class="btn btn-ghost" onclick="closeModal('update-private-modal')">Cancel</button>
       <button class="btn btn-primary" id="update-private-btn" onclick="submitUpdatePrivate()">Update</button>
     </div>
+  </div>
+</div>
+
+<!-- DCF Modal -->
+<div class="overlay" id="dcf-modal">
+  <div class="modal" style="width:680px">
+    <div class="modal-title">DCF Model</div>
+    <div class="modal-subtitle" id="dcf-subtitle"></div>
+    <div class="dcf-grid">
+      <div class="form-group">
+        <label>Base Revenue ($, last 12 mo.)</label>
+        <input id="dcf-base-revenue" type="number" min="0" step="any" placeholder="50000000" />
+      </div>
+      <div class="form-group">
+        <label>Revenue Growth (% / yr)</label>
+        <input id="dcf-revenue-growth" type="number" step="any" />
+      </div>
+      <div class="form-group">
+        <label>FCF Margin (%)</label>
+        <input id="dcf-fcf-margin" type="number" step="any" />
+      </div>
+      <div class="form-group">
+        <label>Discount Rate (%)</label>
+        <input id="dcf-discount-rate" type="number" step="any" />
+      </div>
+      <div class="form-group">
+        <label>Terminal Growth (%)</label>
+        <input id="dcf-terminal-growth" type="number" step="any" />
+      </div>
+      <div class="form-group">
+        <label>Projection Years</label>
+        <input id="dcf-years" type="number" min="1" max="15" step="1" />
+      </div>
+      <div class="form-group">
+        <label>Net Debt ($, negative = net cash)</label>
+        <input id="dcf-net-debt" type="number" step="any" />
+      </div>
+      <div class="form-group" style="grid-column: span 2">
+        <label>Label (optional)</label>
+        <input id="dcf-label" placeholder="Base case after Q3 numbers" />
+      </div>
+    </div>
+    <div class="dcf-result" id="dcf-result"></div>
+    <label class="dcf-check">
+      <input type="checkbox" id="dcf-apply" /> Also set the equity value as this position's current valuation
+    </label>
+    <div class="form-error" id="dcf-error"></div>
+    <div class="modal-footer" style="margin-top:8px">
+      <button class="btn btn-ghost" onclick="closeModal('dcf-modal')">Close</button>
+      <button class="btn btn-primary" id="dcf-save-btn" onclick="submitDcf()">Save Snapshot</button>
+    </div>
+    <div class="modal-title" style="font-size:13px;margin-top:20px">Saved snapshots</div>
+    <div class="dcf-history-wrap" id="dcf-history"></div>
   </div>
 </div>
 
@@ -1124,6 +1193,8 @@
             <button class="btn btn-ghost btn-sm"
               onclick="openFiles('private_position',${p.id},${JSON.stringify(p.company + ' files')})">Files</button>
             <button class="btn btn-ghost btn-sm"
+              onclick="openDcf(${JSON.stringify(thesisName)},${JSON.stringify(p.company)},${p.current_valuation})">DCF</button>
+            <button class="btn btn-ghost btn-sm"
               onclick="openUpdatePrivate(${JSON.stringify(thesisName)},${JSON.stringify(p.company)},${p.current_valuation})">Edit</button>
             <button class="btn btn-warning btn-sm"
               onclick="openClosePrivate(${JSON.stringify(thesisName)},${JSON.stringify(p.company)})">Exit</button>
@@ -1432,6 +1503,155 @@
     const card = document.getElementById('card-' + escId(thesis));
     if (card) card.classList.add('open');
   }
+
+  // DCF model
+  // Percent fields are shown as whole numbers (25 = 25%) and sent as decimals.
+  const DCF_FIELDS = [
+    ['base_revenue',    'dcf-base-revenue',    false],
+    ['revenue_growth',  'dcf-revenue-growth',  true],
+    ['fcf_margin',      'dcf-fcf-margin',      true],
+    ['discount_rate',   'dcf-discount-rate',   true],
+    ['terminal_growth', 'dcf-terminal-growth', true],
+    ['years',           'dcf-years',           false],
+    ['net_debt',        'dcf-net-debt',        false],
+  ];
+  const DCF_DEFAULTS = { base_revenue: '', revenue_growth: 0.30, fcf_margin: 0.15,
+                         discount_rate: 0.15, terminal_growth: 0.03, years: 5, net_debt: 0 };
+  let _dcfTarget = null, _dcfModels = [], _dcfPreviewTimer = null;
+
+  function dcfUrl() {
+    const { thesis, company } = _dcfTarget;
+    return `/api/theses/${encodeURIComponent(thesis)}/private-positions/${encodeURIComponent(company)}/dcf`;
+  }
+  function fillDcfForm(values) {
+    for (const [key, id, isPct] of DCF_FIELDS) {
+      const v = values[key];
+      document.getElementById(id).value = (v === '' || v == null) ? '' : (isPct ? +(v * 100).toFixed(4) : v);
+    }
+  }
+  function readDcfForm() {
+    const out = {};
+    for (const [key, id, isPct] of DCF_FIELDS) {
+      const v = parseFloat(document.getElementById(id).value);
+      if (Number.isNaN(v)) return null;
+      out[key] = isPct ? v / 100 : v;
+    }
+    return out;
+  }
+  function renderDcfSubtitle() {
+    const { thesis, company, currentVal } = _dcfTarget;
+    document.getElementById('dcf-subtitle').textContent =
+      `${company} in "${thesis}". Current valuation: ${fmtB(currentVal)}. Each save keeps a dated snapshot of the assumptions.`;
+  }
+  async function openDcf(thesis, company, currentVal) {
+    _dcfTarget = { thesis, company, currentVal };
+    renderDcfSubtitle();
+    document.getElementById('dcf-label').value = '';
+    document.getElementById('dcf-apply').checked = false;
+    document.getElementById('dcf-error').textContent = '';
+    document.getElementById('dcf-history').innerHTML = '';
+    fillDcfForm(DCF_DEFAULTS);
+    openModal('dcf-modal');
+    await loadDcfHistory();
+    // Start from the most recent snapshot, so updating a model means changing what moved
+    if (_dcfModels.length) fillDcfForm(_dcfModels[0]);
+    previewDcf();
+  }
+  async function loadDcfHistory() {
+    const res = await authFetch(dcfUrl());
+    _dcfModels = res.ok ? await res.json() : [];
+    const el = document.getElementById('dcf-history');
+    if (!_dcfModels.length) {
+      el.innerHTML = '<div class="form-hint">No snapshots yet. Save one to start tracking how your assumptions change.</div>';
+      return;
+    }
+    const pct = v => `${+(v * 100).toFixed(2)}%`;
+    el.innerHTML = `<table class="dcf-history">
+      <tr><th>Saved</th><th>Label</th><th>Revenue</th><th>Growth</th><th>FCF</th><th>Discount</th><th>Terminal</th><th>Yrs</th><th>Equity value</th><th></th></tr>
+      ${_dcfModels.map((m, i) => {
+        // Models are newest first, so the previous snapshot is the next row
+        const prev = _dcfModels[i + 1];
+        const change = prev && prev.equity_value ? (m.equity_value - prev.equity_value) / Math.abs(prev.equity_value) * 100 : null;
+        return `<tr>
+          <td>${esc(m.created_at.slice(0, 10))}</td>
+          <td>${esc(m.label)}</td>
+          <td>${fmtB(m.base_revenue)}</td>
+          <td>${pct(m.revenue_growth)}</td>
+          <td>${pct(m.fcf_margin)}</td>
+          <td>${pct(m.discount_rate)}</td>
+          <td>${pct(m.terminal_growth)}</td>
+          <td>${m.years}</td>
+          <td><strong>${fmtB(m.equity_value)}</strong>${change == null ? '' : ` <span class="${cc(change)}">${fmtPct(change)}</span>`}</td>
+          <td>
+            <button class="btn btn-ghost btn-sm" onclick="loadDcfSnapshot(${m.id})">Load</button>
+            <button class="btn btn-danger btn-sm" onclick="deleteDcf(${m.id})">Delete</button>
+          </td>
+        </tr>`;
+      }).join('')}
+    </table>`;
+  }
+  function loadDcfSnapshot(id) {
+    const m = _dcfModels.find(x => x.id === id);
+    if (!m) return;
+    fillDcfForm(m);
+    document.getElementById('dcf-label').value = m.label;
+    previewDcf();
+  }
+  async function previewDcf() {
+    const box = document.getElementById('dcf-result');
+    const errEl = document.getElementById('dcf-error');
+    const body = readDcfForm();
+    if (!body) { box.innerHTML = '<div class="form-hint" style="grid-column:1/-1">Fill in every assumption to see the valuation.</div>'; return; }
+    const res = await authFetch('/api/dcf/preview', { method: 'POST', body: JSON.stringify(body) });
+    const data = await res.json();
+    if (!res.ok) { box.innerHTML = ''; errEl.textContent = apiErrMsg(data.detail); return; }
+    errEl.textContent = '';
+    const cur = _dcfTarget.currentVal;
+    const vsCur = cur ? (data.equity_value - cur) / cur * 100 : null;
+    box.innerHTML = `
+      <div><label>Enterprise Value</label><span>${fmtB(data.enterprise_value)}</span>
+        <span class="dcf-sub">${fmtB(data.pv_fcf)} cash flows + ${fmtB(data.pv_terminal)} terminal</span></div>
+      <div><label>Equity Value</label><span>${fmtB(data.equity_value)}</span>
+        <span class="dcf-sub">${vsCur == null ? '' : `${fmtPct(vsCur)} vs current valuation`}</span></div>
+      <div><label>Terminal Share</label><span>${(data.terminal_share * 100).toFixed(0)}%</span>
+        <span class="dcf-sub">of enterprise value</span></div>`;
+  }
+  async function submitDcf() {
+    const errEl = document.getElementById('dcf-error');
+    const body = readDcfForm();
+    if (!body) { errEl.textContent = 'Fill in every assumption first.'; return; }
+    body.label = document.getElementById('dcf-label').value.trim();
+    body.apply_valuation = document.getElementById('dcf-apply').checked;
+    const btn = document.getElementById('dcf-save-btn');
+    btn.disabled = true; btn.textContent = 'Saving...';
+    const res = await authFetch(dcfUrl(), { method: 'POST', body: JSON.stringify(body) });
+    btn.disabled = false; btn.textContent = 'Save Snapshot';
+    const data = await res.json();
+    if (!res.ok) { errEl.textContent = apiErrMsg(data.detail); return; }
+    errEl.textContent = '';
+    await loadDcfHistory();
+    if (body.apply_valuation) {
+      _dcfTarget.currentVal = data.equity_value;
+      renderDcfSubtitle();
+      document.getElementById('dcf-apply').checked = false;
+      const { thesis } = _dcfTarget;
+      await loadData(true);
+      const card = document.getElementById('card-' + escId(thesis));
+      if (card) card.classList.add('open');
+      previewDcf();
+    }
+  }
+  async function deleteDcf(id) {
+    if (!confirm('Delete this snapshot?')) return;
+    const res = await authFetch(`/api/dcf/${id}`, { method: 'DELETE' });
+    if (res.ok) await loadDcfHistory();
+  }
+  DCF_FIELDS.forEach(([, id]) => {
+    document.getElementById(id).addEventListener('input', () => {
+      clearTimeout(_dcfPreviewTimer);
+      _dcfPreviewTimer = setTimeout(previewDcf, 250);
+    });
+  });
 
   // Close / exit private
   function openClosePrivate(thesis, company) {

@@ -280,6 +280,119 @@ def delete_private_position(user_id: int, thesis_name: str, company: str) -> Non
 
 
 # ---------------------------------------------------------------------------
+# DCF models
+# ---------------------------------------------------------------------------
+# A deliberately simple DCF: revenue grows at one rate, a fixed share of it
+# becomes free cash flow, and a Gordon-growth terminal value closes it out.
+# Rates are decimals (0.25 = 25%). Each saved model is a snapshot of the
+# assumptions plus the value they produced, so a position builds up a history
+# of how its valuation case changed over time.
+
+DCF_MAX_YEARS = 15
+
+
+def compute_dcf(base_revenue: float, revenue_growth: float, fcf_margin: float,
+                discount_rate: float, terminal_growth: float, years: int,
+                net_debt: float = 0.0) -> dict:
+    if base_revenue <= 0:
+        raise ValueError("Base revenue must be greater than zero.")
+    if not 1 <= years <= DCF_MAX_YEARS:
+        raise ValueError(f"Projection years must be between 1 and {DCF_MAX_YEARS}.")
+    if revenue_growth <= -1:
+        raise ValueError("Revenue growth must be greater than -100%.")
+    if discount_rate <= 0:
+        raise ValueError("Discount rate must be greater than zero.")
+    if discount_rate <= terminal_growth:
+        raise ValueError("Discount rate must be higher than terminal growth.")
+
+    projections = []
+    revenue = base_revenue
+    pv_fcf = 0.0
+    for year in range(1, years + 1):
+        revenue *= 1 + revenue_growth
+        fcf = revenue * fcf_margin
+        pv = fcf / (1 + discount_rate) ** year
+        pv_fcf += pv
+        projections.append({"year": year, "revenue": revenue, "fcf": fcf, "pv": pv})
+
+    final_fcf = projections[-1]["fcf"]
+    terminal_value = final_fcf * (1 + terminal_growth) / (discount_rate - terminal_growth)
+    pv_terminal = terminal_value / (1 + discount_rate) ** years
+    enterprise_value = pv_fcf + pv_terminal
+
+    return {
+        "projections":      projections,
+        "pv_fcf":           pv_fcf,
+        "terminal_value":   terminal_value,
+        "pv_terminal":      pv_terminal,
+        "enterprise_value": enterprise_value,
+        "equity_value":     enterprise_value - net_debt,
+        # How much of the value rests on the terminal assumption
+        "terminal_share":   pv_terminal / enterprise_value if enterprise_value else 0.0,
+    }
+
+
+def _get_private_position(conn, user_id: int, thesis_name: str, company: str):
+    thesis_id = _get_thesis_id(conn, user_id, thesis_name)
+    row = conn.execute(
+        "SELECT * FROM private_positions WHERE thesis_id=? AND company=?", (thesis_id, company)
+    ).fetchone()
+    if not row:
+        raise ValueError(f"'{company}' not found in private positions for '{thesis_name}'.")
+    return row
+
+
+def save_dcf_model(user_id: int, thesis_name: str, company: str, base_revenue: float,
+                   revenue_growth: float, fcf_margin: float, discount_rate: float,
+                   terminal_growth: float, years: int, net_debt: float = 0.0,
+                   label: str = "", apply_valuation: bool = False) -> dict:
+    result = compute_dcf(base_revenue, revenue_growth, fcf_margin, discount_rate,
+                         terminal_growth, years, net_debt)
+    if apply_valuation and result["equity_value"] <= 0:
+        raise ValueError("Equity value is not positive, so it can't be used as the valuation.")
+
+    with get_conn() as conn:
+        pos = _get_private_position(conn, user_id, thesis_name, company)
+        conn.execute(
+            "INSERT INTO dcf_models "
+            "(private_position_id, label, base_revenue, revenue_growth, fcf_margin, discount_rate, "
+            "terminal_growth, years, net_debt, enterprise_value, equity_value) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+            (pos["id"], label, base_revenue, revenue_growth, fcf_margin, discount_rate,
+             terminal_growth, years, net_debt, result["enterprise_value"], result["equity_value"])
+        )
+        if apply_valuation:
+            conn.execute(
+                "UPDATE private_positions SET current_valuation=? WHERE id=?",
+                (result["equity_value"], pos["id"])
+            )
+    return result
+
+
+def get_dcf_models(user_id: int, thesis_name: str, company: str) -> list[dict]:
+    with get_conn() as conn:
+        pos = _get_private_position(conn, user_id, thesis_name, company)
+        rows = conn.execute(
+            "SELECT * FROM dcf_models WHERE private_position_id=? ORDER BY created_at DESC, id DESC",
+            (pos["id"],)
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def delete_dcf_model(user_id: int, model_id: int) -> None:
+    with get_conn() as conn:
+        # Join up to the thesis so one user can't delete another user's model
+        cur = conn.execute(
+            "DELETE FROM dcf_models WHERE id=? AND private_position_id IN ("
+            "  SELECT pp.id FROM private_positions pp JOIN theses t ON t.id = pp.thesis_id"
+            "  WHERE t.user_id=?)",
+            (model_id, user_id)
+        )
+    if cur.rowcount == 0:
+        raise ValueError("DCF model not found.")
+
+
+# ---------------------------------------------------------------------------
 # Enrichment helpers
 # ---------------------------------------------------------------------------
 
