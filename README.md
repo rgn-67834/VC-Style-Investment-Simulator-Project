@@ -4,6 +4,10 @@ A VC-style portfolio simulation tool with multi-user accounts. Track named inves
 
 Built with FastAPI + SQLite + vanilla HTML/JS. Deployable to Railway in one click.
 
+**Live demo:** <https://vc-style-investment-simulator-project-production.up.railway.app> — sign up with any username to try it.
+
+Built with [Claude Code](https://claude.com/claude-code).
+
 ---
 
 ## What it does
