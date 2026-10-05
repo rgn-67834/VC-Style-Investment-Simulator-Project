@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Crossover: VC, PE and public markets tracker</title>
+<title>Crossover: VC, PE and Public Markets Tracker</title>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -270,7 +270,7 @@
   /* STARTUP PIPELINE */
   .pipeline-section { margin-top: 28px; }
   .pipeline-filters { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-  .pipeline-filters input { width: 200px; }
+  .pipeline-filters input { width: 270px; }
   .pipeline-filters select { width: auto; }
   .startup-foot { font-size: 11px; color: var(--muted); margin-top: auto; }
   .startup-badges { display: flex; gap: 6px; flex-wrap: wrap; margin: 2px 0 14px; }
@@ -372,7 +372,7 @@
 </div>
 
 <nav>
-  <div class="nav-brand">Crossover <span class="nav-tagline">VC, PE and public markets</span></div>
+  <div class="nav-brand">Crossover <span class="nav-tagline">VC, PE and Public Markets</span></div>
   <div class="nav-right">
     <span id="last-updated"></span>
     <span class="nav-user" id="nav-username"></span>
@@ -1069,6 +1069,13 @@
     el.value = neg + grouped + (rest.length ? '.' + rest.join('') : '');
   }
   const fmtN = n => n == null ? '—' : Number(n).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+  const fmtShares = n => n == null ? '—' : Number(n).toLocaleString('en-US', {maximumFractionDigits: 4});
+  // "2026-10-04" -> "Oct 4, 2026"
+  const fmtDay = iso => {
+    if (!iso) return '—';
+    const d = new Date(String(iso).slice(0, 10) + 'T12:00:00');
+    return isNaN(d) ? iso : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  };
   const fmtPct = (n, sign=true) => {
     if (n == null) return '—';
     const s = sign && n >= 0 ? '+' : '';
@@ -1239,7 +1246,7 @@
         <div class="thesis-header" onclick="toggleCard('${escId(t.name)}')">
           <div class="thesis-title-group">
             <div class="thesis-name">${esc(t.name)}</div>
-            <div class="thesis-meta">since ${t.created} &middot; ${totalOpen} open &middot; ${totalClosed} closed</div>
+            <div class="thesis-meta">since ${fmtDay(t.created)} &middot; ${totalOpen} open &middot; ${totalClosed} closed</div>
           </div>
           <div class="thesis-stats">
             <div class="thesis-value">${fmt(t.total_value)}</div>
@@ -1268,7 +1275,7 @@
     const posId = p.id || 0;
     return `<tr>
       <td class="ticker-cell"${notesTip}>${esc(p.ticker)}</td>
-      <td class="num">${fmtN(p.shares)}</td>
+      <td class="num">${fmtShares(p.shares)}</td>
       <td class="num">${fmt(p.entry_price)}</td>
       <td class="num">${fmt(p.current_price)}</td>
       <td class="num">${fmt(p.value)}</td>
@@ -1300,7 +1307,7 @@
       : '<span class="badge badge-amber">ST</span>';
     return `<tr>
       <td class="ticker-cell">${esc(p.ticker)}</td>
-      <td class="num" style="font-size:12px;color:var(--muted)">${p.exit_date}</td>
+      <td class="num" style="font-size:12px;color:var(--muted)">${fmtDay(p.exit_date)}</td>
       <td class="num" style="font-size:12px">${fmt(p.entry_price)} &rarr; ${fmt(p.exit_price)}</td>
       <td class="num ${cc(p.actual_gain)}">${as}${fmt(Math.abs(p.actual_gain))} <span style="color:var(--muted);font-size:11px">(${fmtPct(p.actual_gain_pct)})</span></td>
       <td class="num ${cc(p.net_gain)}">${as}${fmt(Math.abs(p.net_gain))}</td>
@@ -1394,7 +1401,7 @@
     const moicBadge = `<span class="badge badge-moic">${fmtDec(p.moic, 2)}x</span>`;
     return `<tr>
       <td class="ticker-cell">${esc(p.company)}</td>
-      <td class="num" style="font-size:12px;color:var(--muted)">${p.exit_date}</td>
+      <td class="num" style="font-size:12px;color:var(--muted)">${fmtDay(p.exit_date)}</td>
       <td class="num">${fmt(p.investment)}</td>
       <td class="num" style="font-size:12px">${fmtB(p.entry_valuation)}</td>
       <td class="num" style="font-size:12px">${fmtB(p.exit_valuation)}</td>
@@ -2328,9 +2335,14 @@
     return _avatarColors[Math.abs(h) % _avatarColors.length];
   }
   function avatarInitials(name) {
-    const words = name.replace(/[^a-zA-Z0-9 ]/g, '').split(/\s+/).filter(Boolean);
-    if (words.length >= 2) return (words[0][0] + words[1][0]).toUpperCase();
-    return name.slice(0, 2).toUpperCase();
+    // Legal suffixes are dropped first, so "Apple Inc." and "Amazon.com Inc."
+    // read as AP and AM instead of both becoming AI
+    const SUFFIX = /^(inc|incorporated|corp|corporation|co|company|ltd|limited|llc|plc|lp|holdings|group|example)$/i;
+    const all = name.replace(/\.com/i, '').replace(/[^a-zA-Z0-9 ]/g, '').split(/\s+/).filter(Boolean);
+    const words = all.filter(w => !SUFFIX.test(w));
+    const use = words.length ? words : all;
+    if (use.length >= 2) return (use[0][0] + use[1][0]).toUpperCase();
+    return (use[0] || name).slice(0, 2).toUpperCase();
   }
 
   function typeBadgeHtml(type) {

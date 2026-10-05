@@ -58,13 +58,19 @@ def _fetch_ticker_data(ticker: str) -> Optional[dict]:
         prev_close = float(fi.previous_close or price)
         day_change_pct = ((price - prev_close) / prev_close * 100) if prev_close else 0
 
+        # Stored as a fraction (0.008 = 0.8%). Yahoo's own dividendYield field
+        # changed units between library versions, so derive it from the
+        # annual dividend and the price instead.
+        rate = info.get("dividendRate")
+        dividend_yield = (float(rate) / price) if rate and price else (0.0 if rate == 0 else None)
+
         return {
             "ticker":         ticker,
             "name":           info.get("longName", ticker),
             "price":          price,
             "day_change_pct": day_change_pct,
             "pe_ratio":       info.get("trailingPE"),
-            "dividend_yield": info.get("dividendYield"),
+            "dividend_yield": dividend_yield,
             "low_52w":        float(fi.year_low)  if fi.year_low  else None,
             "high_52w":       float(fi.year_high) if fi.year_high else None,
             "market_cap":     info.get("marketCap"),
